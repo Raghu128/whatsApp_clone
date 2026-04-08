@@ -1,7 +1,23 @@
-# 🏗️ WhatsApp Clone — Microservices Architecture
+# 🏗️ WhatsApp Clone — System Architecture
 
-## Overview
-A **production-grade, microservices-based** WhatsApp clone where **each service scales independently**. Designed to handle billions of connections with proper service boundaries, async event-driven communication, and isolated databases.
+> A production-grade, microservices-based WhatsApp clone designed for **billions of connections** with independent horizontal scaling per service.
+
+---
+
+## Table of Contents
+
+1. [Tech Stack](#-tech-stack)
+2. [Microservices Architecture](#-microservices-architecture)
+3. [Inter-Service Communication](#-inter-service-communication)
+4. [API Gateway — Stateless JWT](#-api-gateway--stateless-jwt-design)
+5. [Chat Service — Targeted Routing](#-chat-service--targeted-routing-via-connection-directory)
+6. [Database Architecture](#-database-architecture)
+7. [Database Sharding & Scaling](#-database-sharding--scaling)
+8. [Redis Cluster & Hash Slots](#-redis-cluster--hash-slots)
+9. [REST API Endpoints](#-rest-api-endpoints)
+10. [Socket.io Events](#-socketio-events)
+11. [Security](#-security)
+12. [Scaling Strategy](#-scaling-strategy)
 
 ---
 
@@ -10,21 +26,20 @@ A **production-grade, microservices-based** WhatsApp clone where **each service 
 | Layer | Technology | Why |
 |---|---|---|
 | **Runtime** | Node.js (v20+) | Event-driven, non-blocking I/O — perfect for real-time chat |
-| **API Gateway** | Express.js (custom gateway) | Route requests to correct microservice, JWT validation, rate limiting |
-| **Inter-Service (Sync)** | gRPC | Low-latency, type-safe, binary protocol for service-to-service calls |
-| **Inter-Service (Async)** | Redis Pub/Sub + BullMQ | Event-driven communication, job queues for background tasks |
-| **Real-time** | Socket.io + Redis Adapter | WebSocket with horizontal scaling across chat service replicas |
-| **Auth DB** | PostgreSQL | ACID-compliant user credentials and sessions |
-| **User DB** | PostgreSQL | Structured relational data (profiles, contacts, groups) |
-| **Message DB** | MongoDB | Flexible schema, fast writes, time-series queries for chat history |
-| **Notification DB** | MongoDB | Flexible notification payload storage |
-| **Cache / Event Bus** | Redis Cluster | Presence, typing, session cache, pub/sub event bus, rate limiting |
-| **File Storage** | Local (dev) / S3-ready | Media uploads with abstraction layer |
-| **API Docs** | Swagger (OpenAPI 3.0) | Per-service API documentation |
+| **API Gateway** | Express.js (custom) | Route proxying, stateless JWT, rate limiting |
+| **Inter-Service (Sync)** | gRPC | Low-latency, type-safe binary protocol for service-to-service |
+| **Inter-Service (Async)** | Redis Pub/Sub + BullMQ | Event-driven communication, background job queues |
+| **Real-time** | Socket.io + Redis Connection Directory | WebSocket with targeted O(1) message routing |
+| **Auth DB** | PostgreSQL | ACID-compliant user credentials |
+| **User DB** | PostgreSQL | Structured data (profiles, contacts, groups) |
+| **Message DB** | MongoDB (Sharded) | Flexible schema, fast writes, chunk-based sharding |
+| **Notification DB** | MongoDB | Flexible notification payloads with TTL auto-cleanup |
+| **Cache / Event Bus** | Redis Cluster | Presence, typing, connection directory, pub/sub, rate limiting |
+| **File Storage** | Local (dev) / S3 (prod) | Media uploads with abstraction layer |
+| **API Docs** | Swagger (OpenAPI 3.0) | Per-service interactive API documentation |
 | **Testing** | Jest + Supertest + Socket.io Client | Unit, integration, and WebSocket tests |
 | **Frontend** | React (Vite) | Simple, fast, component-based UI |
-| **Containerization** | Docker + Docker Compose | Each service gets its own container |
-| **Service Discovery** | Docker DNS (dev) / Consul (prod) | Services find each other by name |
+| **Containerization** | Docker + Docker Compose | Each service in its own container |
 
 ---
 
@@ -43,9 +58,9 @@ A **production-grade, microservices-based** WhatsApp clone where **each service 
 │                     🔀 API GATEWAY (Port 3000)                               │
 │                                                                              │
 │  • Route-based HTTP & WebSocket proxying                                     │
-│  • Stateless JWT validation (Shared secret)                                  │
-│  • Fast token revocation check via Redis Blacklist                           │
-│  • Rate limiting (Redis sliding window)                                      │
+│  • Stateless JWT validation (shared secret — NO network call to Auth!)       │
+│  • Fast token revocation check via Redis blacklist                           │
+│  • Rate limiting (Redis sliding window, per-user + per-IP)                   │
 │  • Request logging & correlation IDs                                         │
 │  • Load balancing across service replicas                                    │
 └────┬──────────┬──────────┬──────────┬──────────┬──────────┬─────────────────┘
@@ -64,7 +79,7 @@ A **production-grade, microservices-based** WhatsApp clone where **each service 
 ┌─────────┐┌─────────┐┌──────────┐┌─────────┐┌─────────┐┌──────────────┐
 │PostgreSQL││PostgreSQL││ MongoDB  ││  Redis  ││  Local/ ││   MongoDB    │
 │(Auth DB) ││(User DB) ││(Msg DB)  ││(Presence││   S3    ││(Notif DB)    │
-│          ││          ││          ││  Store) ││         ││              │
+│          ││          ││ SHARDED  ││  Store) ││         ││              │
 └──────────┘└──────────┘└──────────┘└─────────┘└─────────┘└──────────────┘
 
                     ┌─────────────────────────────┐
@@ -72,28 +87,31 @@ A **production-grade, microservices-based** WhatsApp clone where **each service 
                     │                              │
                     │  • Event Bus (Pub/Sub)       │
                     │  • BullMQ Job Queues         │
-                    │  • Socket.io Adapter         │
-                    │  • Session Cache             │
+                    │  • Connection Directory      │
+                    │  • Session/Token Blacklist   │
                     │  • Rate Limit Counters       │
+                    │  • Presence & Typing         │
                     └─────────────────────────────┘
 ```
 
 ### Why This Decomposition?
 
-| Service | Scaling Reason | Example |
+| Service | Scaling Reason | Traffic Pattern |
 |---|---|---|
-| **Auth Service** | Low traffic after login. Scale to 2 replicas. | Users login once a day |
-| **User Service** | Medium traffic. Scale to 3-5 replicas. | Profile views, contact searches |
-| **Chat/Message Service** | **Highest traffic**. Scale to 20+ replicas. | Billions of messages/day |
-| **Presence Service** | High traffic (heartbeats). Scale to 10+ replicas. | Every user sends heartbeat every 25s |
-| **Media Service** | CPU-heavy (image processing). Scale with more CPU. | Thumbnail generation, compression |
-| **Notification Service** | Async, bursty. Scale workers independently. | Group messages → 256 notifications |
+| **Auth Service** | Low traffic after login → 2-3 replicas | Users login once/day |
+| **User Service** | Medium traffic → 3-5 replicas | Profile views, contact searches |
+| **Chat/Message Service** | **Highest traffic** → 20-50+ replicas | Billions of messages/day |
+| **Presence Service** | High traffic → 10-20 replicas | Heartbeat every 25s per user |
+| **Media Service** | CPU-heavy → 5-10 replicas | Thumbnail generation, compression |
+| **Notification Service** | Bursty → 5-10 replicas | Group message → 256 notifications |
 
 ---
 
 ## 🔄 Inter-Service Communication
 
 ### Synchronous (gRPC) — When response is needed immediately
+
+Used only where one service **needs data from another** to complete a request:
 
 ```
 ┌────────────┐  gRPC: getUserProfile(userId) ┌────────────┐
@@ -104,11 +122,13 @@ A **production-grade, microservices-based** WhatsApp clone where **each service 
 │Chat Service │ ──────────────────────────▶     │User Service │
 └────────────┘  ◀── { members[] } ────────     └────────────┘
 
-*Note: API Gateway validates JWT statelessly using a shared secret and 
-checks for revocation in Redis, removing the network hop to Auth!*
+Note: API Gateway does NOT call Auth Service for token validation.
+It validates JWT statelessly using a shared secret (see next section).
 ```
 
 ### Asynchronous (Redis Pub/Sub + BullMQ) — Fire-and-forget events
+
+Used for notifications, status updates, and background processing:
 
 ```
 ┌─────────────┐                        ┌──────────────────┐
@@ -127,7 +147,7 @@ checks for revocation in Redis, removing the network hop to Auth!*
             └──────────────┘          └──────────────┘        └──────────────┘
 ```
 
-### Event Catalog
+### Complete Event Catalog
 
 | Event Name | Publisher | Subscribers | Payload |
 |---|---|---|---|
@@ -141,293 +161,190 @@ checks for revocation in Redis, removing the network hop to Auth!*
 | `media.uploaded` | Media Service | Chat Service | `{ mediaId, url, thumbnailUrl, type }` |
 | `media.processing.done` | Media Service | Chat Service | `{ mediaId, processedUrl }` |
 | `user.online` | Presence Service | Chat Service | `{ userId, isOnline, lastSeen }` |
-| `notification.created` | Notification Service | — (pushes to client via WebSocket) | `{ userId, notification }` |
+| `notification.created` | Notification Service | — (pushes via WebSocket) | `{ userId, notification }` |
 
 ---
 
-## 📁 Microservices Project Structure
+## 🔑 API Gateway — Stateless JWT Design
+
+### The Problem With RPC-based Token Validation
+
+If the API Gateway makes a network call to Auth Service for every request:
+- At 1M requests/sec, that's 1M extra RPCs/sec
+- Auth Service becomes a bottleneck
+- Single point of failure
+
+### Our Solution: Stateless Validation + Redis Blacklist
 
 ```
-Whatsapp_clone/
-├── services/                           # All microservices
-│   ├── api-gateway/                    # 🔀 API Gateway (Port 3000)
-│   │   ├── src/
-│   │   │   ├── config/
-│   │   │   │   ├── env.js
-│   │   │   │   ├── redis.js
-│   │   │   │   └── services.js         # Service registry (URLs/ports)
-│   │   │   ├── middleware/
-│   │   │   │   ├── auth.middleware.js   # Stateless JWT verify + Redis blacklist
-│   │   │   │   ├── rateLimiter.js      # Redis sliding window
-│   │   │   │   ├── correlationId.js    # Request tracing
-│   │   │   │   ├── requestLogger.js    # Winston structured logging
-│   │   │   │   └── errorHandler.js
-│   │   │   ├── proxy/
-│   │   │   │   ├── httpProxy.js        # Proxy REST to services
-│   │   │   │   └── wsProxy.js          # Proxy WebSocket to Chat Service
-│   │   │   ├── routes/
-│   │   │   │   └── index.js            # Route mapping → service
-│   │   │   └── app.js
-│   │   ├── Dockerfile
-│   │   ├── package.json
-│   │   └── .env.example
-│   │
-│   ├── auth-service/                   # 🔐 Auth Service (Port 3001)
-│   │   ├── src/
-│   │   │   ├── config/
-│   │   │   │   ├── database.js         # PostgreSQL connection
-│   │   │   │   ├── redis.js            # Session store
-│   │   │   │   └── env.js
-│   │   │   ├── models/
-│   │   │   │   └── User.js             # Auth-specific user model (credentials only)
-│   │   │   ├── controllers/
-│   │   │   │   └── auth.controller.js
-│   │   │   ├── services/
-│   │   │   │   ├── auth.service.js
-│   │   │   │   └── token.service.js    # JWT create/verify/refresh
-│   │   │   ├── grpc/
-│   │   │   │   ├── server.js           # gRPC server (validateToken, etc.)
-│   │   │   │   └── auth.proto          # Protocol buffer definitions
-│   │   │   ├── routes/
-│   │   │   │   └── auth.routes.js
-│   │   │   ├── middleware/
-│   │   │   │   └── validator.js
-│   │   │   ├── events/
-│   │   │   │   └── publisher.js        # Publishes: user.registered
-│   │   │   └── app.js
-│   │   ├── tests/
-│   │   ├── Dockerfile
-│   │   ├── package.json
-│   │   └── .env.example
-│   │
-│   ├── user-service/                   # 👤 User Service (Port 3002)
-│   │   ├── src/
-│   │   │   ├── config/
-│   │   │   │   ├── database.js         # PostgreSQL connection
-│   │   │   │   ├── redis.js
-│   │   │   │   └── env.js
-│   │   │   ├── models/
-│   │   │   │   ├── UserProfile.js      # Full profile data
-│   │   │   │   ├── Contact.js
-│   │   │   │   ├── Group.js
-│   │   │   │   └── GroupMember.js
-│   │   │   ├── controllers/
-│   │   │   │   ├── user.controller.js
-│   │   │   │   ├── contact.controller.js
-│   │   │   │   └── group.controller.js
-│   │   │   ├── services/
-│   │   │   │   ├── user.service.js
-│   │   │   │   ├── contact.service.js
-│   │   │   │   └── group.service.js
-│   │   │   ├── grpc/
-│   │   │   │   ├── server.js           # gRPC: getUserProfile, getGroupMembers
-│   │   │   │   └── user.proto
-│   │   │   ├── routes/
-│   │   │   │   ├── user.routes.js
-│   │   │   │   ├── contact.routes.js
-│   │   │   │   └── group.routes.js
-│   │   │   ├── events/
-│   │   │   │   ├── publisher.js        # Publishes: user.profile.updated, group.member.*
-│   │   │   │   └── subscriber.js       # Listens: user.registered
-│   │   │   └── app.js
-│   │   ├── tests/
-│   │   ├── Dockerfile
-│   │   ├── package.json
-│   │   └── .env.example
-│   │
-│   ├── chat-service/                   # 💬 Chat/Message Service (Port 3003)
-│   │   ├── src/
-│   │   │   ├── config/
-│   │   │   │   ├── database.js         # MongoDB connection
-│   │   │   │   ├── redis.js            # Socket.io adapter + cache
-│   │   │   │   └── env.js
-│   │   │   ├── models/
-│   │   │   │   ├── ChatRoom.js         # Mongoose model
-│   │   │   │   └── Message.js          # Mongoose model
-│   │   │   ├── controllers/
-│   │   │   │   ├── chat.controller.js
-│   │   │   │   └── message.controller.js
-│   │   │   ├── services/
-│   │   │   │   ├── chat.service.js
-│   │   │   │   ├── message.service.js
-│   │   │   │   └── encryption.service.js  # AES-256 message encryption at rest
-│   │   │   ├── socket/
-│   │   │   │   ├── index.js            # Socket.io init + Redis adapter
-│   │   │   │   ├── handlers/
-│   │   │   │   │   ├── message.handler.js
-│   │   │   │   │   ├── typing.handler.js
-│   │   │   │   │   └── chatRoom.handler.js
-│   │   │   │   └── middleware/
-│   │   │   │       └── socketAuth.js   # Validates JWT via Auth Service gRPC
-│   │   │   ├── grpc/
-│   │   │   │   ├── client.js           # gRPC clients (Auth, User, Presence)
-│   │   │   │   └── chat.proto
-│   │   │   ├── routes/
-│   │   │   │   ├── chat.routes.js
-│   │   │   │   └── message.routes.js
-│   │   │   ├── events/
-│   │   │   │   ├── publisher.js        # Publishes: message.sent, message.delivered, message.read
-│   │   │   │   └── subscriber.js       # Listens: media.uploaded, user.online, group.member.*
-│   │   │   └── app.js
-│   │   ├── tests/
-│   │   ├── Dockerfile
-│   │   ├── package.json
-│   │   └── .env.example
-│   │
-│   ├── presence-service/               # 🟢 Presence Service (Port 3004)
-│   │   ├── src/
-│   │   │   ├── config/
-│   │   │   │   ├── redis.js            # Primary data store (Redis only!)
-│   │   │   │   └── env.js
-│   │   │   ├── controllers/
-│   │   │   │   └── presence.controller.js
-│   │   │   ├── services/
-│   │   │   │   ├── presence.service.js   # Online/offline, last seen
-│   │   │   │   └── typing.service.js     # Typing indicators
-│   │   │   ├── routes/
-│   │   │   │   └── presence.routes.js
-│   │   │   ├── events/
-│   │   │   │   ├── publisher.js        # Publishes: user.online, user.offline
-│   │   │   │   └── subscriber.js       # Listens: message.sent (update last activity)
-│   │   │   └── app.js
-│   │   ├── tests/
-│   │   ├── Dockerfile
-│   │   ├── package.json
-│   │   └── .env.example
-│   │
-│   ├── media-service/                  # 📁 Media Service (Port 3005)
-│   │   ├── src/
-│   │   │   ├── config/
-│   │   │   │   ├── storage.js          # Local/S3 abstraction
-│   │   │   │   ├── redis.js
-│   │   │   │   └── env.js
-│   │   │   ├── controllers/
-│   │   │   │   └── media.controller.js
-│   │   │   ├── services/
-│   │   │   │   ├── upload.service.js
-│   │   │   │   ├── download.service.js
-│   │   │   │   └── processor.service.js  # Sharp: thumbnails, compression
-│   │   │   ├── workers/
-│   │   │   │   └── media.worker.js     # BullMQ worker for async processing
-│   │   │   ├── routes/
-│   │   │   │   └── media.routes.js
-│   │   │   ├── middleware/
-│   │   │   │   └── upload.js           # Multer config
-│   │   │   ├── events/
-│   │   │   │   └── publisher.js        # Publishes: media.uploaded, media.processing.done
-│   │   │   └── app.js
-│   │   ├── uploads/                    # Local file storage (dev)
-│   │   ├── tests/
-│   │   ├── Dockerfile
-│   │   ├── package.json
-│   │   └── .env.example
-│   │
-│   └── notification-service/           # 🔔 Notification Service (Port 3006)
-│       ├── src/
-│       │   ├── config/
-│       │   │   ├── database.js         # MongoDB connection
-│       │   │   ├── redis.js
-│       │   │   └── env.js
-│       │   ├── models/
-│       │   │   └── Notification.js     # Mongoose model
-│       │   ├── controllers/
-│       │   │   └── notification.controller.js
-│       │   ├── services/
-│       │   │   ├── notification.service.js
-│       │   │   └── push.service.js     # Web push notifications
-│       │   ├── workers/
-│       │   │   └── notification.worker.js  # BullMQ worker
-│       │   ├── routes/
-│       │   │   └── notification.routes.js
-│       │   ├── events/
-│       │   │   └── subscriber.js       # Listens: message.sent, group.member.*, user.registered
-│       │   └── app.js
-│       ├── tests/
-│       ├── Dockerfile
-│       ├── package.json
-│       └── .env.example
-│
-├── shared/                             # 📦 Shared Libraries (npm workspace)
-│   ├── proto/                          # gRPC Protocol Buffers
-│   │   ├── auth.proto
-│   │   ├── user.proto
-│   │   └── chat.proto
-│   ├── utils/
-│   │   ├── logger.js                   # Shared Winston logger config
-│   │   ├── encryption.js              # AES-256 encrypt/decrypt
-│   │   ├── responseFormatter.js
-│   │   └── correlationId.js
-│   ├── events/
-│   │   ├── eventBus.js                # Redis Pub/Sub wrapper
-│   │   ├── eventNames.js             # Central event name constants
-│   │   └── eventSchemas.js           # Joi schemas for event payloads
-│   ├── middleware/
-│   │   ├── errorHandler.js            # Shared error handling
-│   │   └── validator.js               # Shared Joi validation
-│   └── package.json
-│
-├── client/                             # React Frontend (Simple)
-│   ├── src/
-│   │   ├── components/
-│   │   │   ├── Auth/
-│   │   │   │   ├── Login.jsx
-│   │   │   │   └── Register.jsx
-│   │   │   ├── Chat/
-│   │   │   │   ├── ChatList.jsx
-│   │   │   │   ├── ChatWindow.jsx
-│   │   │   │   ├── MessageBubble.jsx
-│   │   │   │   ├── MessageInput.jsx
-│   │   │   │   └── TypingIndicator.jsx
-│   │   │   ├── Group/
-│   │   │   │   ├── CreateGroup.jsx
-│   │   │   │   └── GroupInfo.jsx
-│   │   │   ├── Profile/
-│   │   │   │   └── UserProfile.jsx
-│   │   │   └── Common/
-│   │   │       ├── Avatar.jsx
-│   │   │       ├── StatusBadge.jsx
-│   │   │       └── NotificationBadge.jsx
-│   │   ├── pages/
-│   │   │   ├── LoginPage.jsx
-│   │   │   ├── RegisterPage.jsx
-│   │   │   └── ChatPage.jsx
-│   │   ├── hooks/
-│   │   │   ├── useSocket.js
-│   │   │   ├── useAuth.js
-│   │   │   └── useChat.js
-│   │   ├── services/
-│   │   │   ├── api.js                  # Axios instance → API Gateway
-│   │   │   └── socket.js              # Socket.io client
-│   │   ├── context/
-│   │   │   ├── AuthContext.jsx
-│   │   │   └── ChatContext.jsx
-│   │   ├── App.jsx
-│   │   └── main.jsx
-│   ├── package.json
-│   └── vite.config.js
-│
-├── docker-compose.yml                  # ALL services + databases
-├── docker-compose.dev.yml              # Dev overrides (volumes, hot reload)
-├── nginx/
-│   └── nginx.conf                      # Load balancer config
-├── docs/                               # Architecture documentation
-│   ├── ARCHITECTURE.md                # System overview
-│   ├── DATABASE_SCHEMA.md
-│   ├── API_ENDPOINTS.md
-│   ├── SOCKET_EVENTS.md
-│   ├── INTER_SERVICE_COMMUNICATION.md
-│   └── SCALING_STRATEGY.md
-├── package.json                        # Root: npm workspaces
-├── .env.example
-├── .gitignore
-└── README.md
+┌──────────────────────────────────────────────────────────────────────┐
+│                    API GATEWAY — Auth Flow                            │
+│                                                                      │
+│  1. Client sends: GET /api/v1/users/profile                         │
+│     Header: Authorization: Bearer <jwt-token>                        │
+│                                                                      │
+│  2. Gateway extracts JWT from header                                 │
+│                                                                      │
+│  3. jwt.verify(token, SHARED_SECRET)  ← LOCAL, no network call!     │
+│     • Checks signature (is it tampered?)                             │
+│     • Checks expiry (is it expired?)                                 │
+│     • Extracts: { userId, username, iat, exp }                       │
+│     • Time: ~0.1ms                                                   │
+│                                                                      │
+│  4. Redis: GET blacklist:{tokenHash}  ← O(1) Redis lookup           │
+│     • If exists → token was revoked (user logged out) → 401          │
+│     • If not exists → token is valid → proceed                       │
+│     • Time: ~0.5ms                                                   │
+│                                                                      │
+│  5. Forward request to target service with:                          │
+│     Header: x-user-id: <userId>                                     │
+│     Header: x-correlation-id: <uuid>                                │
+│                                                                      │
+│  Total auth overhead: ~0.6ms (vs ~5-10ms with RPC to Auth Service)  │
+└──────────────────────────────────────────────────────────────────────┘
+```
+
+### How Logout/Revocation Works
+
+```
+User clicks "Logout":
+1. Client calls: POST /api/v1/auth/logout
+2. Auth Service receives the request
+3. Auth Service adds token hash to Redis blacklist:
+   SET blacklist:{sha256(token)} "revoked" EX {remaining_token_ttl}
+4. Token TTL is 15 minutes → blacklist entry auto-expires after 15 min
+5. After 15 min, the token itself is expired anyway → no blacklist needed
+
+Result: Zero stale tokens, minimal Redis storage
+```
+
+### Why This Works
+
+| Concern | Solution |
+|---|---|
+| **Tampering** | JWT signature verification (HMAC-SHA256) |
+| **Expiry** | JWT `exp` claim checked locally |
+| **Revocation** | Redis blacklist with auto-expiring TTL |
+| **Horizontal scaling** | All Gateway replicas share the same secret + Redis |
+| **Auth Service down?** | Gateway still works! Auth is only needed for login/register |
+
+---
+
+## 💬 Chat Service — Targeted Routing via Connection Directory
+
+### The Problem With Broadcasting (Socket.io Redis Adapter)
+
+The default Socket.io Redis Adapter broadcasts every message to ALL server instances:
+
+```
+Message from User A → broadcast to ALL 50 chat servers → only 1 server has User B
+
+Result: 49 servers receive and discard the message = O(N) waste
+At 100B messages/day with 50 servers = 4.9 TRILLION wasted broadcasts/day
+```
+
+### Our Solution: Redis Connection Directory (O(1) Routing)
+
+This is how WhatsApp actually works (using Erlang process registry). We implement the same pattern with Redis:
+
+```
+Step 1: User connects → Register in Redis
+─────────────────────────────────────────
+
+User B connects to Chat Server 3:
+  Redis: SET connection:userB "chat-server-3:3003" EX 60
+  Redis: SADD user:sockets:userB "socketId_xyz"
+
+User B's heartbeat refreshes TTL every 25s:
+  Redis: EXPIRE connection:userB 60
+
+
+Step 2: User A sends message to User B
+─────────────────────────────────────────
+
+┌──────────────┐                    ┌──────────────┐
+│ Chat Server 1│                    │ Chat Server 3│
+│ (User A)     │                    │ (User B)     │
+└──────┬───────┘                    └──────▲───────┘
+       │                                   │
+       │ 1. User A sends message           │
+       │    via WebSocket                  │
+       │                                   │
+       │ 2. Save to MongoDB               │
+       │                                   │
+       │ 3. Query Redis:                   │
+       │    GET connection:userB           │
+       │    → "chat-server-3:3003"         │
+       │                                   │
+       │ 4. Direct internal RPC            │
+       │    to Chat Server 3:              │
+       │    "Deliver to User B"  ──────────┤
+       │                                   │
+       │                           5. Chat Server 3
+       │                              pushes via WebSocket
+       │                              to User B
+       │                                   │
+       ▼                                   ▼
+   ┌───────┐                          ┌───────┐
+   │User A │                          │User B │
+   │  ✓✓   │ ← delivery receipt ──── │ 📩    │
+   └───────┘                          └───────┘
+
+
+Step 3: User B is OFFLINE
+─────────────────────────
+
+GET connection:userB → null (key expired or doesn't exist)
+→ Save message to MongoDB with status: { sent: Date }
+→ When User B comes online later, fetch undelivered messages
+→ Mark as delivered, send delivery receipt to User A
+```
+
+### Multi-Device Support
+
+```
+User B has 2 devices (phone + web):
+
+Redis:
+  connection:userB:device1 → "chat-server-3:3003"
+  connection:userB:device2 → "chat-server-7:3003"
+  SADD user:devices:userB "device1" "device2"
+
+Message delivery:
+  1. SMEMBERS user:devices:userB → ["device1", "device2"]
+  2. GET connection:userB:device1 → "chat-server-3:3003"
+  3. GET connection:userB:device2 → "chat-server-7:3003"
+  4. Direct RPC to Chat Server 3 + Chat Server 7
+  5. Both devices receive the message simultaneously
+```
+
+### Group Message Routing
+
+```
+Group "College Friends" has 200 members:
+
+1. User A sends message to group
+2. Chat Service fetches group members: gRPC → User Service → 200 member IDs
+3. Pipeline Redis lookups:
+   MGET connection:user1 connection:user2 ... connection:user200
+4. Group by server:
+   chat-server-1: [user3, user15, user88, ...]   → 1 batch RPC
+   chat-server-2: [user7, user42, ...]            → 1 batch RPC
+   chat-server-3: [user1, user99, ...]            → 1 batch RPC
+   offline: [user5, user33, ...]                   → save for later
+5. Each server delivers to its local WebSocket connections
+
+Result: Instead of 200 individual RPCs, we make ~N RPCs where N = number of servers
+(typically 5-10 RPCs for 200 members, not 200)
 ```
 
 ---
 
-## 🗃️ Database Ownership (Each Service Owns Its Data)
+## 🗃️ Database Architecture
 
-> **Rule:** No service directly accesses another service's database. All cross-service data access goes through gRPC or events.
+### Database Ownership Rule
+
+> **No service directly accesses another service's database.** All cross-service data access goes through gRPC or events.
 
 ### Auth Service → PostgreSQL (auth_db)
 
@@ -452,7 +369,6 @@ CREATE TABLE refresh_tokens (
     created_at      TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- Index for fast token lookup
 CREATE INDEX idx_refresh_tokens_user ON refresh_tokens(user_id);
 CREATE INDEX idx_refresh_tokens_hash ON refresh_tokens(token_hash);
 ```
@@ -461,19 +377,19 @@ CREATE INDEX idx_refresh_tokens_hash ON refresh_tokens(token_hash);
 
 ```sql
 CREATE TABLE user_profiles (
-    id              UUID PRIMARY KEY,  -- Same UUID from Auth Service
+    id              UUID PRIMARY KEY,   -- Same UUID from Auth Service
     display_name    VARCHAR(100),
     avatar_url      VARCHAR(500),
     about           VARCHAR(500) DEFAULT 'Hey there! I am using WhatsApp',
-    privacy_settings JSONB DEFAULT '{"last_seen": "everyone", "avatar": "everyone", "about": "everyone"}',
+    privacy_settings JSONB DEFAULT '{"last_seen":"everyone","avatar":"everyone","about":"everyone"}',
     created_at      TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at      TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
 CREATE TABLE contacts (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id         UUID NOT NULL,  -- References user_profiles.id
-    contact_id      UUID NOT NULL,  -- References user_profiles.id
+    user_id         UUID NOT NULL,
+    contact_id      UUID NOT NULL,
     nickname        VARCHAR(100),
     is_blocked      BOOLEAN DEFAULT false,
     created_at      TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
@@ -501,13 +417,14 @@ CREATE TABLE group_members (
     UNIQUE(group_id, user_id)
 );
 
--- Indexes for fast lookups
+-- Performance indexes
 CREATE INDEX idx_contacts_user ON contacts(user_id);
+CREATE INDEX idx_contacts_contact ON contacts(contact_id);
 CREATE INDEX idx_group_members_group ON group_members(group_id);
 CREATE INDEX idx_group_members_user ON group_members(user_id);
 ```
 
-### Chat/Message Service → MongoDB (chat_db)
+### Chat/Message Service → MongoDB (chat_db) — SHARDED
 
 ```javascript
 // ChatRoom Collection
@@ -526,22 +443,22 @@ CREATE INDEX idx_group_members_user ON group_members(user_id);
     updatedAt: Date
 }
 // Indexes: { participants: 1 }, { updatedAt: -1 }
-// Shard Key: _id (hashed) for horizontal distribution
+// Shard Key: _id (hashed)
 
-// Message Collection
+// Message Collection — PRIMARY DATA, SHARDED
 {
     _id: ObjectId,
     chatRoomId: ObjectId,
     sender: UUID,
     type: 'text' | 'image' | 'video' | 'audio' | 'document' | 'location' | 'contact',
     content: {
-        text: String,              // Encrypted (AES-256-GCM)
+        text: String,                // Encrypted (AES-256-GCM)
         mediaUrl: String,
         thumbnailUrl: String,
         fileName: String,
         fileSize: Number,
         mimeType: String,
-        duration: Number,
+        duration: Number,            // For audio/video
         location: {
             latitude: Number,
             longitude: Number,
@@ -584,38 +501,294 @@ CREATE INDEX idx_group_members_user ON group_members(user_id);
     isRead: Boolean,
     isPushed: Boolean,
     createdAt: Date,
-    expiresAt: Date              // TTL index for auto-cleanup
+    expiresAt: Date               // TTL index — auto-delete after 30 days
 }
 // Indexes: { userId: 1, createdAt: -1 }, { expiresAt: 1 } (TTL)
 ```
 
-### Presence Service → Redis (No persistent DB!)
+### Presence Service → Redis (No Persistent DB!)
 
 ```
-# Online Status (TTL 30s, refreshed by heartbeat)
+# Online Status (TTL 30s, refreshed by heartbeat every 25s)
 presence:online:{userId}              → "1"
 
-# Last Seen (persistent — no TTL)
-presence:lastseen:{userId}            → "2026-04-06T17:30:00Z"
+# Last Seen (no TTL — persists until next online)
+presence:lastseen:{userId}            → "2026-04-08T15:30:00Z"
 
-# Typing Indicators (TTL 3s)
+# Typing Indicators (TTL 3s — auto-expires)
 presence:typing:{chatRoomId}:{userId} → "1"
 
-# User Socket Mapping (for multi-device)
-presence:sockets:{userId}            → SET { socketId1, socketId2 }
+# Connection Directory (TTL 60s, refreshed by heartbeat)
+connection:{userId}                   → "chat-server-3:3003"
+user:devices:{userId}                 → SET { "device1", "device2" }
+connection:{userId}:{deviceId}        → "chat-server-7:3003"
 
 # Unread Count Cache
 presence:unread:{userId}:{chatRoomId} → count
+
+# Token Blacklist (TTL = remaining token lifetime)
+blacklist:{sha256(token)}             → "revoked"
 ```
 
 ---
 
-## 🔌 API Routes (Through API Gateway)
+## 📊 Database Sharding & Scaling
+
+### MongoDB Sharding (Chunk-Based — Messages)
+
+MongoDB uses **chunk-based sharding**, NOT simple modular hashing. This means adding new shards does NOT require rehashing all data.
+
+#### How It Works
+
+```
+Step 1: Entire hash range is divided into CHUNKS (default 128MB each)
+────────────────────────────────────────────────────────────────────
+
+Hash range: [MinKey ─────────────────────────────── MaxKey]
+
+Chunk 1        Chunk 2        Chunk 3        Chunk 4        Chunk 5
+[min, -500)    [-500, -200)   [-200, 100)    [100, 400)     [400, max]
+
+
+Step 2: Chunks are distributed across shards
+────────────────────────────────────────────
+
+Shard 0: [Chunk 1, Chunk 4]    → 2 chunks
+Shard 1: [Chunk 2, Chunk 5]    → 2 chunks
+Shard 2: [Chunk 3]             → 1 chunk
+
+
+Step 3: Adding a new shard → Balancer migrates chunks
+──────────────────────────────────────────────────────
+
+Add Shard 3 (empty):
+  Balancer sees uneven distribution
+  Moves Chunk 4 from Shard 0 → Shard 3
+
+Result:
+  Shard 0: [Chunk 1]              ← 1 chunk
+  Shard 1: [Chunk 2, Chunk 5]     ← 2 chunks
+  Shard 2: [Chunk 3]              ← 1 chunk
+  Shard 3: [Chunk 4]              ← 1 chunk ✅ Balanced!
+
+Only Chunk 4's data was moved. NOT everything!
+Zero downtime. Background migration.
+```
+
+#### Why NOT Simple Modular Hashing?
+
+```
+Simple hash: shard = hash(chatRoomId) % N
+
+With 3 shards (N=3):
+  hash("roomA") = 14  → 14 % 3 = 2 → Shard 2
+  hash("roomB") = 7   → 7 % 3 = 1  → Shard 1
+
+Add shard (N=4):
+  hash("roomA") = 14  → 14 % 4 = 2 → Shard 2 ✅ Same
+  hash("roomB") = 7   → 7 % 4 = 3  → Shard 3 ❌ WAS Shard 1!
+
+Result: ~75% of ALL data needs to move. CATASTROPHIC at scale!
+```
+
+#### Consistent Hashing (Ring-Based) — Used by Redis, Cassandra, DynamoDB
+
+An alternative to chunk-based: place servers and keys on a virtual ring.
+
+```
+                        0°
+                   ┌────┴────┐
+                  /           \
+    key:D(300°) /  key:A(45°)  \
+              /                  \
+         270°│    Shard 0 (30°)  │ 90°
+             │                   │
+        Shard 3      RING       Shard 1
+        (250°)                  (120°)
+              \                /
+                \ key:B(130°)/
+                  \        /
+                   └──┬───┘
+                      │
+                 Shard 2 (200°)
+                     180°
+
+key:A (45°)  → walk clockwise → Shard 1 (120°)
+key:B (130°) → walk clockwise → Shard 2 (200°)
+key:D (300°) → walk clockwise → Shard 0 (30°)  ← wraps around ring!
+
+Adding a new shard at 160°:
+  Only keys between 120° and 160° move to the new shard
+  Everything else stays put!
+  Result: Only ~1/N of data moves (with N shards)
+```
+
+#### Virtual Nodes (VNodes) — Solving Uneven Distribution
+
+```
+Problem: 4 physical servers on ring → uneven arc lengths
+
+Solution: Each server gets 150+ virtual positions on the ring
+
+  S0-v1, S0-v2, S0-v3, ... S0-v150  (150 vnodes for Shard 0)
+  S1-v1, S1-v2, S1-v3, ... S1-v150  (150 vnodes for Shard 1)
+  
+  600 total points on ring → nearly perfect distribution
+  Each server owns many tiny arcs instead of one big arc
+```
+
+#### Comparison
+
+| Approach | Data Moved on Add | Downtime | Used By |
+|---|---|---|---|
+| Simple hash `% N` | ~75% | Hours/Days | Nobody serious |
+| Consistent hashing (ring) | ~1/N (~25% with 4 nodes) | Minutes | Redis, Cassandra, DynamoDB |
+| Consistent hashing + vnodes | ~1/N, evenly spread | Minutes | Cassandra, DynamoDB |
+| **Chunk-based (MongoDB)** | **Only necessary chunks** | **Zero downtime** | **MongoDB** ✅ |
+
+#### Our MongoDB Sharding Setup
+
+```bash
+# Enable sharding on database
+sh.enableSharding("chat_db")
+
+# Shard the messages collection by chatRoomId (hashed)
+sh.shardCollection("chat_db.messages", { chatRoomId: "hashed" })
+
+# Adding a new shard when load increases — ONE COMMAND
+sh.addShard("shard4-rs/shard4-host:27018")
+# MongoDB balancer automatically migrates chunks in the background
+# Zero downtime. Zero code changes.
+```
+
+#### Each Shard is a Replica Set (Read/Write Split)
+
+```
+                    Shard 1 (Replica Set)
+                    ┌──────────────────────┐
+                    │                      │
+    ALL Writes ────▶│  PRIMARY             │
+                    │                      │
+                    └──────┬───────┬───────┘
+                           │       │
+                    ┌──────▼──┐ ┌──▼──────┐
+    ALL Reads ─────▶│SECONDARY│ │SECONDARY│◀──── ALL Reads
+                    │(Replica)│ │(Replica) │
+                    └─────────┘ └──────────┘
+
+Read Preference: "secondaryPreferred"
+→ Reads go to replicas → frees up primary for writes
+```
+
+### PostgreSQL Scaling (Auth DB & User DB)
+
+PostgreSQL doesn't shard natively like MongoDB. We use a layered strategy:
+
+#### Layer 1: Primary + Read Replicas
+
+```
+                    ┌─────────────────────┐
+    ALL Writes ────▶│  PRIMARY (Master)   │
+                    └──────┬─────┬────────┘
+                           │     │  (Streaming Replication)
+                    ┌──────▼─┐ ┌─▼───────┐
+    ALL Reads ─────▶│Replica │ │ Replica │◀───── ALL Reads
+                    │   1    │ │   2     │
+                    └────────┘ └─────────┘
+
+Why this works:
+  Auth: Write ratio ~1:100 (register once, validate token 100x)
+  Users: Write ratio ~1:50 (update profile rarely, read constantly)
+```
+
+#### Layer 2: Connection Pooling (PgBouncer)
+
+```
+20 service replicas × 10 connections = 200 connections
+PostgreSQL max: ~500 before degradation
+
+Solution:
+  Service replicas ──200──▶ PgBouncer ──20──▶ PostgreSQL
+  PgBouncer multiplexes 200 incoming → 20 actual connections
+```
+
+#### Layer 3: Table Partitioning (Contacts Table)
+
+When contacts table reaches billions of rows:
+
+```sql
+CREATE TABLE contacts (
+    id UUID, user_id UUID NOT NULL, contact_id UUID NOT NULL,
+    nickname VARCHAR(100), is_blocked BOOLEAN DEFAULT false,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+) PARTITION BY HASH (user_id);
+
+-- 16 partitions → queries scan 1/16th of data
+CREATE TABLE contacts_p0  PARTITION OF contacts FOR VALUES WITH (MODULUS 16, REMAINDER 0);
+CREATE TABLE contacts_p1  PARTITION OF contacts FOR VALUES WITH (MODULUS 16, REMAINDER 1);
+-- ... up to contacts_p15
+```
+
+#### Application-Level Read/Write Splitting (Actual Code)
+
+```javascript
+// Sequelize configuration with read replicas
+const sequelize = new Sequelize({
+  dialect: 'postgres',
+  replication: {
+    write: {
+      host: 'pg-primary.internal',
+      username: 'app',
+      password: process.env.DB_PASSWORD
+    },
+    read: [
+      { host: 'pg-replica-1.internal', username: 'app', password: process.env.DB_PASSWORD },
+      { host: 'pg-replica-2.internal', username: 'app', password: process.env.DB_PASSWORD }
+    ]
+  },
+  pool: { max: 20, min: 5, idle: 10000 }
+});
+
+// Mongoose (MongoDB) read preference
+mongoose.connect(MONGO_URI, {
+  readPreference: 'secondaryPreferred'  // Reads go to replicas
+});
+```
+
+---
+
+## 🔴 Redis Cluster & Hash Slots
+
+Redis Cluster automatically distributes data across nodes using **16384 hash slots**:
+
+```
+┌───────────────┐  ┌───────────────┐  ┌───────────────┐
+│  Redis Node 1 │  │  Redis Node 2 │  │  Redis Node 3 │
+│ Slots 0-5460  │  │ Slots 5461-   │  │ Slots 10923-  │
+│               │  │     10922     │  │     16383     │
+└───────┬───────┘  └───────┬───────┘  └───────┬───────┘
+        │                  │                  │
+┌───────▼───────┐  ┌───────▼───────┐  ┌───────▼───────┐
+│  Replica 1    │  │  Replica 2    │  │  Replica 3    │
+│  (failover)   │  │  (failover)   │  │  (failover)   │
+└───────────────┘  └───────────────┘  └───────────────┘
+
+Key routing:
+  CRC16("connection:userA") % 16384 = 2341 → Slot 2341 → Node 1
+  CRC16("connection:userD") % 16384 = 12044 → Slot 12044 → Node 3
+
+Adding Node 4:
+  Redis re-distributes some slots to Node 4 automatically
+  Uses consistent hashing internally
+```
+
+---
+
+## 🔌 REST API Endpoints
 
 ### API Gateway Route Mapping
 
 ```javascript
-// API Gateway routes → Service forwarding
 const ROUTE_MAP = {
     '/api/v1/auth/**':          'http://auth-service:3001',
     '/api/v1/users/**':         'http://user-service:3002',
@@ -626,19 +799,19 @@ const ROUTE_MAP = {
     '/api/v1/presence/**':      'http://presence-service:3004',
     '/api/v1/media/**':         'http://media-service:3005',
     '/api/v1/notifications/**': 'http://notification-service:3006',
-    '/socket.io/**':            'ws://chat-service:3003',  // WebSocket proxy
+    '/socket.io/**':            'ws://chat-service:3003',
 };
 ```
 
-### Auth Service APIs
+### Auth Service (Port 3001)
 | Method | Endpoint | Description |
 |---|---|---|
 | POST | `/api/v1/auth/register` | Register new user |
 | POST | `/api/v1/auth/login` | Login (returns JWT) |
 | POST | `/api/v1/auth/refresh` | Refresh access token |
-| POST | `/api/v1/auth/logout` | Logout + invalidate token |
+| POST | `/api/v1/auth/logout` | Logout + blacklist token |
 
-### User Service APIs
+### User Service (Port 3002)
 | Method | Endpoint | Description |
 |---|---|---|
 | GET | `/api/v1/users/profile` | Get own profile |
@@ -657,7 +830,7 @@ const ROUTE_MAP = {
 | DELETE | `/api/v1/groups/:id/members/:uid` | Remove member |
 | POST | `/api/v1/groups/:id/leave` | Leave group |
 
-### Chat/Message Service APIs
+### Chat/Message Service (Port 3003)
 | Method | Endpoint | Description |
 |---|---|---|
 | GET | `/api/v1/chats` | Get all chat rooms |
@@ -669,21 +842,21 @@ const ROUTE_MAP = {
 | PUT | `/api/v1/messages/:id/star` | Star/unstar |
 | GET | `/api/v1/messages/search?q=` | Search messages |
 
-### Presence Service APIs
+### Presence Service (Port 3004)
 | Method | Endpoint | Description |
 |---|---|---|
 | GET | `/api/v1/presence/:userId` | Get user online status |
 | GET | `/api/v1/presence/bulk` | Get multiple users' status |
 | POST | `/api/v1/presence/heartbeat` | Refresh online status |
 
-### Media Service APIs
+### Media Service (Port 3005)
 | Method | Endpoint | Description |
 |---|---|---|
 | POST | `/api/v1/media/upload` | Upload media file |
 | GET | `/api/v1/media/:id` | Download/stream media |
 | GET | `/api/v1/media/:id/thumbnail` | Get thumbnail |
 
-### Notification Service APIs
+### Notification Service (Port 3006)
 | Method | Endpoint | Description |
 |---|---|---|
 | GET | `/api/v1/notifications` | Get notifications (paginated) |
@@ -705,7 +878,7 @@ const ROUTE_MAP = {
 | `message:delete` | `{ messageId, deleteType }` | Delete message |
 | `typing:start` | `{ chatRoomId }` | Started typing |
 | `typing:stop` | `{ chatRoomId }` | Stopped typing |
-| `heartbeat` | `{}` | Keep-alive (forwarded to Presence Service) |
+| `heartbeat` | `{}` | Keep-alive for presence + connection directory |
 | `chat:join` | `{ chatRoomId }` | Join chat room |
 
 ### Server → Client
@@ -716,69 +889,29 @@ const ROUTE_MAP = {
 | `message:status` | `{ messageId, status, userId }` | Delivery/read receipt |
 | `message:deleted` | `{ messageId, deleteType }` | Message deleted |
 | `typing:update` | `{ chatRoomId, userId, isTyping }` | Typing indicator |
-| `user:status` | `{ userId, isOnline, lastSeen }` | Online/offline update |
+| `user:status` | `{ userId, isOnline, lastSeen }` | Online/offline |
 | `notification:new` | `{ notification }` | New notification |
 | `group:updated` | `{ groupId, changes }` | Group info changed |
 
 ---
 
-## ⚡ Scaling Strategy (Designed for Billions)
+## 🔐 Security
 
-### Per-Service Scaling
-
-```
-┌───────────────┬──────────┬─────────────────────────────────────────────┐
-│ Service       │ Replicas │ Scaling Strategy                            │
-├───────────────┼──────────┼─────────────────────────────────────────────┤
-│ API Gateway   │ 3-5      │ Stateless → scale horizontally behind LB   │
-│ Auth Service  │ 2-3      │ Low after initial login spike               │
-│ User Service  │ 3-5      │ Medium: profile reads, contact lookups      │
-│ Chat Service  │ 20-50+   │ HIGHEST: message throughput, Socket.io      │
-│ Presence Svc  │ 10-20    │ High: heartbeats every 25s per user         │
-│ Media Service │ 5-10     │ CPU-bound: image/video processing           │
-│ Notification  │ 5-10     │ Bursty: group msg → N notifications        │
-└───────────────┴──────────┴─────────────────────────────────────────────┘
-```
-
-### Chat Service Horizontal Scaling (Targeted Routing via Erlang/WhatsApp Model)
-
-Rather than broadcasting every message to all servers (which melts down Redis at scale), we use a **Session Directory in Redis**:
-
-```
-                    ┌──────────────────────┐
-                    │    API Gateway        │
-                    │  (WebSocket Proxy)    │
-                    └────┬────┬────┬────┬───┘
-                         │    │    │    │
-              ┌──────────▼┐  ▼┐  ┌▼┐  ┌▼──────────┐
-              │Chat Svc 1 │  ││  │ │  │Chat Svc 3 │
-              │ Socket.io │  ││  │ │  │ Socket.io │
-              └─────┬─────┘──┘┘──┘ └──┘─────┬──────┘
-                    │                       │
-                    └───────┬───────────────┘
-                    ┌───────▼───────┐
-                    │   Redis       │
-                    │  Connection   │
-                    │  Directory    │
-                    └───────────────┘
-
-User A (on Chat Svc 1) sends message to User B (on Chat Svc 3):
-1. Chat Svc 1 receives message (WebSocket) and saves to MongoDB.
-2. Chat Svc 1 queries Redis: `GET connection:userB`
-3. Redis replies: `"chat-service-3:3003"`
-4. Chat Svc 1 makes a direct internal RPC call to Chat Svc 3: "Deliver this to User B".
-5. Chat Svc 3 delivers the message via its local WebSocket connection.
-This provides O(1) routing instead of O(N) broadcasting!
-```
-
-### Database Scaling
-
-| Database | Strategy |
+| Feature | Implementation |
 |---|---|
-| **MongoDB (Messages)** | Shard by `chatRoomId` (hashed) — keeps chat messages co-located |
-| **PostgreSQL (Auth)** | Read replicas for token validation (hot path) |
-| **PostgreSQL (Users)** | Read replicas for profile lookups, partition contacts by user_id |
-| **Redis** | Redis Cluster (6+ nodes) — automatic sharding |
+| Password Hashing | bcrypt (12 salt rounds) |
+| Auth Tokens | JWT (access 15min + refresh 7days) |
+| Token Validation | Stateless at API Gateway (shared secret) |
+| Token Revocation | Redis blacklist with auto-expiring TTL |
+| Message Encryption | AES-256-GCM at rest in MongoDB |
+| Inter-Service Auth | Internal network (Docker) + shared secrets |
+| Rate Limiting | Redis sliding window (per-user + per-IP) |
+| Input Validation | Joi schema validation per service |
+| File Upload | Multer with type/size restrictions |
+| CORS | Whitelist-based origin validation |
+| Helmet | HTTP security headers on all services |
+| XSS Protection | DOMPurify for message content |
+| Request Tracing | Correlation IDs across all services |
 
 ### Rate Limiting Strategy
 
@@ -796,171 +929,80 @@ global           → 5000 requests/minute per IP
 
 ---
 
-## 🔐 Security
+## ⚡ Scaling Strategy
 
-| Feature | Implementation |
-|---|---|
-| Password Hashing | bcrypt (12 salt rounds) |
-| Auth Tokens | JWT (access 15min + refresh 7days) |
-| Message Encryption | AES-256-GCM at rest in MongoDB |
-| Inter-Service Auth | Internal shared secret / mTLS (production) |
-| Rate Limiting | Redis sliding window (per-user + per-IP) |
-| Input Validation | Joi schema validation per service |
-| File Upload | Multer with type/size restrictions |
-| CORS | Whitelist-based origin validation |
-| Helmet | HTTP security headers on all services |
-| XSS Protection | DOMPurify for message content |
-| Request Tracing | Correlation IDs across all services |
+### Per-Service Scaling
 
----
+| Service | Replicas | Why |
+|---|---|---|
+| API Gateway | 3-5 | Stateless → scale horizontally behind LB |
+| Auth Service | 2-3 | Low after initial login spike |
+| User Service | 3-5 | Medium: profile reads, contact lookups |
+| Chat Service | **20-50+** | **HIGHEST**: message throughput + WebSocket |
+| Presence Service | 10-20 | High: heartbeats every 25s per user |
+| Media Service | 5-10 | CPU-bound: image/video processing |
+| Notification Service | 5-10 | Bursty: group msg → N notifications |
 
-## 🐳 Docker Compose
+### Complete Production Topology
 
-```yaml
-# docker-compose.yml overview
-services:
-  # Infrastructure
-  postgres-auth:      # Auth Service DB
-  postgres-user:      # User Service DB
-  mongodb:            # Chat + Notification DB
-  redis:              # Event bus, cache, presence, Socket.io adapter
-
-  # Application Services
-  api-gateway:        # Port 3000
-  auth-service:       # Port 3001
-  user-service:       # Port 3002
-  chat-service:       # Port 3003
-  presence-service:   # Port 3004
-  media-service:      # Port 3005
-  notification-service: # Port 3006
-
-  # Frontend
-  client:             # Port 5173
-
-  # Load Balancer (optional, for multi-replica demo)
-  nginx:              # Port 80
 ```
-
----
-
-## 🚀 Implementation Phases
-
-### Phase 1: Project Scaffolding ⏱️ ~2 hours
-- [ ] Set up npm workspaces (monorepo)
-- [ ] Create shared library (logger, error handler, event bus, response formatter)
-- [ ] Set up Docker Compose (PostgreSQL × 2, MongoDB, Redis)
-- [ ] Create base Express app template for services
-- [ ] Environment config with validation (dotenv + Joi)
-- [ ] .gitignore, .env.example files
-
-### Phase 2: Auth Service ⏱️ ~3 hours
-- [ ] PostgreSQL: auth_users, refresh_tokens tables
-- [ ] Register, Login, Refresh, Logout APIs
-- [ ] JWT access/refresh token flow
-- [ ] bcrypt password hashing
-- [ ] gRPC server: validateToken, getUserId
-- [ ] Redis session cache
-- [ ] Publish `user.registered` event
-- [ ] Swagger docs
-- [ ] Unit + integration tests
-
-### Phase 3: API Gateway ⏱️ ~3 hours
-- [ ] Route-based HTTP proxy to services
-- [ ] WebSocket proxy to Chat Service
-- [ ] JWT validation via Auth Service gRPC
-- [ ] Redis rate limiting middleware
-- [ ] Correlation ID injection
-- [ ] Request logging (Winston)
-- [ ] Global error handling
-
-### Phase 4: User Service ⏱️ ~3 hours
-- [ ] PostgreSQL: user_profiles, contacts, groups, group_members
-- [ ] Subscribe to `user.registered` → create profile
-- [ ] Profile CRUD, avatar upload
-- [ ] Contact management (add, remove, block)
-- [ ] Group CRUD + member management
-- [ ] gRPC server: getUserProfile, getGroupMembers
-- [ ] Swagger docs
-- [ ] Tests
-
-### Phase 5: Chat/Message Service (Core) ⏱️ ~5 hours
-- [ ] MongoDB: ChatRoom, Message collections with indexes
-- [ ] Socket.io setup with Redis Adapter
-- [ ] WebSocket auth via Auth Service gRPC
-- [ ] Send/receive all message types
-- [ ] Message status tracking (sent → delivered → read)
-- [ ] Chat room management (create, list, paginated messages)
-- [ ] AES-256-GCM message encryption at rest
-- [ ] Publish events: message.sent, message.delivered, message.read
-- [ ] Subscribe to: media.uploaded, group.member.*, user.online
-- [ ] Swagger docs
-- [ ] Tests (REST + Socket.io)
-
-### Phase 6: Presence Service ⏱️ ~2 hours
-- [ ] Redis-only data store (no persistent DB)
-- [ ] Online/offline tracking with heartbeat TTL
-- [ ] Last seen timestamps
-- [ ] Typing indicators with auto-expire
-- [ ] Bulk presence lookup API
-- [ ] Publish: user.online, user.offline
-- [ ] Subscribe: message.sent (update last activity)
-- [ ] Tests
-
-### Phase 7: Media Service ⏱️ ~2 hours
-- [ ] Multer upload with file type/size validation
-- [ ] Sharp: image compression + thumbnail generation
-- [ ] Local storage with S3-compatible abstraction
-- [ ] BullMQ worker for async media processing
-- [ ] Media streaming/download endpoint
-- [ ] Publish: media.uploaded, media.processing.done
-- [ ] Tests
-
-### Phase 8: Notification Service ⏱️ ~2 hours
-- [ ] MongoDB: notifications collection with TTL index
-- [ ] Subscribe to: message.sent, group.member.*, user.registered
-- [ ] Create notifications from events
-- [ ] Push notifications via Chat Service WebSocket
-- [ ] Notification APIs (list, read, read-all, unread count)
-- [ ] BullMQ worker for batch notification processing
-- [ ] Tests
-
-### Phase 9: React Frontend ⏱️ ~4 hours
-- [ ] Login/Register pages
-- [ ] Chat list sidebar with last message + unread count
-- [ ] Chat window with all message types
-- [ ] Message input with media attachment picker
-- [ ] Message status indicators (✓ ✓✓ blue ✓✓)
-- [ ] Typing indicator
-- [ ] Online/offline status badges
-- [ ] Group chat UI (create, info, members)
-- [ ] Profile page
-- [ ] Notification badges
-- [ ] Responsive design
-
-### Phase 10: Documentation & Polish ⏱️ ~2 hours
-- [ ] Professional README with architecture diagrams
-- [ ] ARCHITECTURE.md — system design doc
-- [ ] SCALING_STRATEGY.md — detailed scaling decisions
-- [ ] Swagger docs for all services
-- [ ] API_ENDPOINTS.md — consolidated API reference
-- [ ] SOCKET_EVENTS.md — WebSocket event catalog
-- [ ] INTER_SERVICE_COMMUNICATION.md — event flows
+┌──────────────────────────────────────────────────────────────────────┐
+│                     FULL SYSTEM AT SCALE                             │
+├──────────────────────────────────────────────────────────────────────┤
+│                                                                      │
+│  SERVICES (Kubernetes / Docker Swarm)                                │
+│  ┌─────────────┐ ┌─────────────┐ ┌─────────────┐                   │
+│  │ API Gateway  │ │Auth Service │ │User Service │                   │
+│  │ ×5 replicas  │ │ ×3 replicas │ │ ×5 replicas │                   │
+│  └─────────────┘ └─────────────┘ └─────────────┘                   │
+│  ┌─────────────┐ ┌─────────────┐ ┌──────────────┐                  │
+│  │Chat Service │ │Presence Svc │ │Media Service │                   │
+│  │ ×50 replicas│ │ ×20 replicas│ │ ×10 replicas │                   │
+│  └─────────────┘ └─────────────┘ └──────────────┘                   │
+│  ┌──────────────┐                                                    │
+│  │Notification  │                                                    │
+│  │ ×10 replicas │                                                    │
+│  └──────────────┘                                                    │
+│                                                                      │
+│  DATABASES                                                           │
+│  ┌────────────────┐  ┌────────────────┐                             │
+│  │PostgreSQL(Auth)│  │PostgreSQL(User)│                              │
+│  │1 Primary+2 Rep │  │1 Primary+2 Rep │  + PgBouncer pools          │
+│  └────────────────┘  └────────────────┘                             │
+│                                                                      │
+│  ┌─────────────────────────────────────────────┐                    │
+│  │ MongoDB Sharded Cluster (Messages)           │                    │
+│  │ 3 mongos + 3 config + 6 shards × 3 = 24     │                    │
+│  └─────────────────────────────────────────────┘                    │
+│                                                                      │
+│  ┌────────────────┐                                                  │
+│  │MongoDB (Notif) │                                                  │
+│  │ 1P + 2S        │                                                  │
+│  └────────────────┘                                                  │
+│                                                                      │
+│  ┌─────────────────────────────────────────────┐                    │
+│  │ Redis Cluster (6 nodes: 3 primary + 3 rep)  │                    │
+│  └─────────────────────────────────────────────┘                    │
+│                                                                      │
+│  GRAND TOTAL: ~130+ containers at full scale                        │
+└──────────────────────────────────────────────────────────────────────┘
+```
 
 ---
 
 ## 📊 Resume Impact — Interview Talking Points
 
-### Architecture Decisions
-> "I decomposed the system into 7 microservices based on scaling requirements. The Chat Service handles the highest throughput and can scale to 50+ replicas independently, while the Auth Service only needs 2-3 replicas since users authenticate once per session."
+### Architecture
+> "I decomposed the system into 7 microservices based on independent scaling requirements. The Chat Service handles the highest throughput at 50+ replicas, while Auth Service only needs 2-3."
 
-### Inter-Service Communication
-> "I used gRPC for synchronous calls like token validation (latency-critical) and Redis Pub/Sub for async events like notifications (fire-and-forget). This gives us the best of both worlds — fast validation and decoupled processing."
+### Stateless JWT
+> "I eliminated the Auth Service bottleneck by using stateless JWT validation at the API Gateway. Token revocation is handled via a Redis blacklist with auto-expiring TTLs matching the token lifetime."
 
-### Database Per Service
-> "Each service owns its database — no shared databases. The Auth Service uses PostgreSQL for ACID-compliant credential storage, the Chat Service uses MongoDB for flexible message schemas with chatRoomId-based sharding, and the Presence Service uses Redis as its primary store since presence data is ephemeral."
+### Targeted Routing
+> "Instead of broadcasting messages to all servers via Socket.io Redis Adapter (O(N)), I implemented a Redis Connection Directory for O(1) targeted routing — similar to WhatsApp's Erlang process registry."
 
-### Horizontal Scaling
-> "The Chat Service uses Socket.io with a Redis Adapter. When User A on Node 1 sends a message to User B on Node 3, Redis Pub/Sub broadcasts the event to all nodes, and Node 3 delivers it to User B's socket. This allows unlimited horizontal scaling."
+### Database Design
+> "Each service owns its database. MongoDB is sharded by chatRoomId using chunk-based sharding for zero-downtime scaling. PostgreSQL uses read replicas for the 1:100 write-to-read ratio."
 
-### Event-Driven Design
-> "When a message is sent, the Chat Service publishes a `message.sent` event. The Notification Service picks it up and generates push notifications, the Presence Service updates last activity — all asynchronously without blocking the message send path."
+### Event-Driven
+> "Services communicate asynchronously via Redis Pub/Sub. When a message is sent, the Notification Service and Presence Service react independently without blocking the message delivery path."
