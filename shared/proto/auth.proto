@@ -1,0 +1,42 @@
+syntax = "proto3";
+
+package auth;
+
+// Auth Service gRPC definitions
+// Used by API Gateway and other services to validate tokens and get user credentials
+
+service AuthService {
+  // Validate a JWT token and return the decoded payload
+  rpc ValidateToken (ValidateTokenRequest) returns (ValidateTokenResponse);
+
+  // Get user credentials (for internal service use only)
+  rpc GetUserCredentials (GetUserCredentialsRequest) returns (GetUserCredentialsResponse);
+}
+
+// ── ValidateToken ──
+
+message ValidateTokenRequest {
+  string token = 1;
+}
+
+message ValidateTokenResponse {
+  bool valid = 1;
+  string user_id = 2;
+  string username = 3;
+  string error_message = 4;
+}
+
+// ── GetUserCredentials ──
+
+message GetUserCredentialsRequest {
+  string user_id = 1;
+}
+
+message GetUserCredentialsResponse {
+  string user_id = 1;
+  string username = 2;
+  string phone = 3;
+  string email = 4;
+  bool is_active = 5;
+  string created_at = 6;
+}

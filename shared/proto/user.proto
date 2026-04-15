@@ -1,0 +1,61 @@
+syntax = "proto3";
+
+package user;
+
+// User Service gRPC definitions
+// Used by Chat Service to fetch user profiles and group member lists
+
+service UserService {
+  // Get a user's profile information
+  rpc GetUserProfile (GetUserProfileRequest) returns (GetUserProfileResponse);
+
+  // Get all members of a group (for group message delivery)
+  rpc GetGroupMembers (GetGroupMembersRequest) returns (GetGroupMembersResponse);
+
+  // Get multiple user profiles in a batch
+  rpc GetUserProfiles (GetUserProfilesRequest) returns (GetUserProfilesResponse);
+}
+
+// ── GetUserProfile ──
+
+message GetUserProfileRequest {
+  string user_id = 1;
+}
+
+message GetUserProfileResponse {
+  string user_id = 1;
+  string display_name = 2;
+  string avatar_url = 3;
+  string about = 4;
+  string phone = 5;
+}
+
+// ── GetGroupMembers ──
+
+message GetGroupMembersRequest {
+  string group_id = 1;
+}
+
+message GroupMember {
+  string user_id = 1;
+  string display_name = 2;
+  string avatar_url = 3;
+  string role = 4;        // 'admin' or 'member'
+  string joined_at = 5;
+}
+
+message GetGroupMembersResponse {
+  string group_id = 1;
+  repeated GroupMember members = 2;
+  int32 total_members = 3;
+}
+
+// ── GetUserProfiles (Batch) ──
+
+message GetUserProfilesRequest {
+  repeated string user_ids = 1;
+}
+
+message GetUserProfilesResponse {
+  repeated GetUserProfileResponse profiles = 1;
+}

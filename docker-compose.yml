@@ -1,0 +1,93 @@
+# ============================================
+# WhatsApp Clone — Docker Compose
+# ============================================
+# Spins up all infrastructure dependencies:
+#   - PostgreSQL (auth_db on 5432, user_db on 5433)
+#   - MongoDB (chat_db + notification_db on 27017)
+#   - Redis (6379)
+#
+# Usage:
+#   docker compose up -d         # Start all
+#   docker compose down          # Stop all
+#   docker compose logs -f       # Stream logs
+#   docker compose down -v       # Stop + delete volumes
+
+services:
+  # ── PostgreSQL: Auth DB ──
+  postgres-auth:
+    image: postgres:16-alpine
+    container_name: whatsapp-postgres-auth
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: auth_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres_password
+    volumes:
+      - postgres_auth_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d auth_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── PostgreSQL: User DB ──
+  postgres-user:
+    image: postgres:16-alpine
+    container_name: whatsapp-postgres-user
+    restart: unless-stopped
+    ports:
+      - "5433:5432"
+    environment:
+      POSTGRES_DB: user_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres_password
+    volumes:
+      - postgres_user_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d user_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── MongoDB: Chat + Notification DBs ──
+  mongodb:
+    image: mongo:7.0
+    container_name: whatsapp-mongodb
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── Redis ──
+  redis:
+    image: redis:7-alpine
+    container_name: whatsapp-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_auth_data:
+    driver: local
+  postgres_user_data:
+    driver: local
+  mongodb_data:
+    driver: local
+  redis_data:
+    driver: local

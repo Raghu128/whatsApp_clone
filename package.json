@@ -1,0 +1,31 @@
+{
+  "name": "whatsapp-clone",
+  "version": "1.0.0",
+  "description": "Production-grade WhatsApp clone with microservices architecture",
+  "private": true,
+  "workspaces": [
+    "shared",
+    "services/*",
+    "client"
+  ],
+  "scripts": {
+    "dev:auth": "npm run dev --workspace=services/auth-service",
+    "dev:user": "npm run dev --workspace=services/user-service",
+    "dev:chat": "npm run dev --workspace=services/chat-service",
+    "dev:presence": "npm run dev --workspace=services/presence-service",
+    "dev:media": "npm run dev --workspace=services/media-service",
+    "dev:notification": "npm run dev --workspace=services/notification-service",
+    "dev:gateway": "npm run dev --workspace=services/api-gateway",
+    "dev:client": "npm run dev --workspace=client",
+    "docker:up": "docker compose up -d",
+    "docker:down": "docker compose down",
+    "docker:logs": "docker compose logs -f",
+    "test": "npm run test --workspaces --if-present",
+    "lint": "npm run lint --workspaces --if-present"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "author": "Raghu Kumar",
+  "license": "MIT"
+}

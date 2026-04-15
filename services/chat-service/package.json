@@ -1,0 +1,35 @@
+{
+  "name": "@whatsapp-clone/chat-service",
+  "version": "1.0.0",
+  "description": "Chat/Message microservice — real-time messaging, Socket.io, encryption",
+  "main": "src/app.js",
+  "scripts": {
+    "dev": "nodemon src/app.js",
+    "start": "node src/app.js",
+    "test": "jest --forceExit"
+  },
+  "dependencies": {
+    "@whatsapp-clone/shared": "*",
+    "express": "^4.18.2",
+    "cors": "^2.8.5",
+    "helmet": "^7.1.0",
+    "compression": "^1.7.4",
+    "morgan": "^1.10.0",
+    "dotenv": "^16.3.1",
+    "mongoose": "^8.0.0",
+    "socket.io": "^4.7.2",
+    "joi": "^17.11.0",
+    "ioredis": "^5.3.2",
+    "@grpc/grpc-js": "^1.9.9",
+    "@grpc/proto-loader": "^0.7.10",
+    "jsonwebtoken": "^9.0.2",
+    "swagger-jsdoc": "^6.2.8",
+    "swagger-ui-express": "^5.0.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.1",
+    "jest": "^29.7.0",
+    "supertest": "^6.3.3",
+    "socket.io-client": "^4.7.2"
+  }
+}
