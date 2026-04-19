@@ -27,7 +27,7 @@ async function bootstrap() {
   try {
     await connectDatabase();
     
-    // Bind EventBus correctly mappings logically tracking effectively smartly brilliantly smoothly efficiently adequately reliably matching identical properly smartly natively successfully predictably safely natively.
+    // Bind EventBus correctly mappings.
     setupSubscribers();
 
     startServer({
@@ -36,13 +36,13 @@ async function bootstrap() {
       serviceName: 'notification-service',
       log,
       onShutdown: async () => {
-        log.info('Shutting down Notification Service perfectly smoothly gracefully appropriately identical smoothly intelligently adequately mapping cleanly safely properly nicely smoothly sensibly gracefully naturally elegantly smoothly seamlessly securely intelligently perfectly neatly stably predictably natively safely brilliantly flexibly successfully elegantly smartly correctly safely correctly safely securely mapping smartly expertly organically...');
+        log.info('Shutting down Notification Service gracefully...');
         await teardownSubscribers();
         await disconnectAll();
       },
     });
   } catch (err) {
-    log.error('Bootstrap uniquely efficiently intelligently mapping failed smartly natively safely mapping correctly nicely smartly identically elegantly effectively nicely correctly seamlessly cleanly identically intelligently stably optimally expertly securely sensibly optimally smoothly identically logically matching successfully safely properly mapping effectively optimally successfully correctly comfortably identical naturally identical reliably identical successfully identical successfully effectively.', { error: err.message });
+    log.error('Bootstrap mapping failed.', { error: err.message });
     process.exit(1);
   }
 }

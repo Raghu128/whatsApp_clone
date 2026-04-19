@@ -4,7 +4,7 @@
 
 const { success } = require('@whatsapp-clone/shared/utils/responseFormatter');
 const { AppError } = require('@whatsapp-clone/shared/middleware/errorHandler');
-const { decryptData } = require('@whatsapp-clone/shared/utils/encryption');
+const { decrypt } = require('@whatsapp-clone/shared/utils/encryption');
 const config = require('../config/env');
 const Message = require('../models/Message');
 
@@ -24,7 +24,7 @@ const messageController = {
       // Decrypt contents dynamically returning cleanly
       const decryptedMessages = messages.map(msg => {
         const doc = msg.toJSON();
-        doc.content = decryptData(doc.content, config.ENCRYPTION_KEY);
+        doc.content = decrypt(doc.content);
         return doc;
       });
 

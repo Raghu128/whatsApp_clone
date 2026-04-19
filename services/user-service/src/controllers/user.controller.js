@@ -15,6 +15,13 @@ const userController = {
     } catch (err) { next(err); }
   },
 
+  async getUser(req, res, next) {
+    try {
+      const profile = await userService.getProfile(req.params.id);
+      return success(res, profile, 'User retrieved');
+    } catch (err) { next(err); }
+  },
+
   async updateProfile(req, res, next) {
     try {
       const profile = await userService.updateProfile(req.headers['x-user-id'], req.body);

@@ -24,9 +24,9 @@ const PUBLIC_ROUTES = [
   '/api/v1/gateway/status',
 ];
 
-// List of route prefixes that do not require JWT authorization (e.g. Swagger)
 const PUBLIC_PREFIXES = [
   '/api-docs',
+  '/socket.io'
 ];
 
 async function authMiddleware(req, res, next) {

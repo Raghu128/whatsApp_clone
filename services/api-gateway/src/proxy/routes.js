@@ -7,22 +7,27 @@
  * Tasks 3.3, 3.4
  */
 
-const { createProxyMiddleware } = require('http-proxy-middleware');
+const { createProxyMiddleware, fixRequestBody } = require('http-proxy-middleware');
 const config = require('../config/env');
 
 const proxyOptions = {
   changeOrigin: true,
   logLevel: config.NODE_ENV === 'development' ? 'debug' : 'error',
-  // Error handling if downstream service is offline
+  onProxyReq: fixRequestBody,
   onError: (err, req, res) => {
-    res.status(503).json({
-      success: false,
-      error: {
-        code: 'SERVICE_UNAVAILABLE',
-        message: 'The requested downstream service is currently unavailable.',
-        details: err.message,
-      },
-    });
+    if (res.status) {
+      res.status(503).json({
+        success: false,
+        error: {
+          code: 'SERVICE_UNAVAILABLE',
+          message: 'The requested downstream service is currently unavailable.',
+          details: err.message,
+        },
+      });
+    } else if (res.end) {
+      // It's a raw TCP socket (WebSocket proxy error), safely close it
+      res.end();
+    }
   },
 };
 

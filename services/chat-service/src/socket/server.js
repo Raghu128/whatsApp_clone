@@ -9,7 +9,7 @@
 const { Server } = require('socket.io');
 const { createAdapter } = require('@socket.io/redis-adapter');
 const logger = require('@whatsapp-clone/shared/utils/logger');
-const { encryptData, decryptData } = require('@whatsapp-clone/shared/utils/encryption');
+const { encrypt, decrypt } = require('@whatsapp-clone/shared/utils/encryption');
 
 const config = require('../config/env');
 const { redisClient } = require('../config/redis');
@@ -72,7 +72,7 @@ class SocketServer {
           }
 
           // Task 5.15: AES Integration configuring properties safely
-          const encryptedContent = encryptData(text || mediaUrl, config.ENCRYPTION_KEY);
+          const encryptedContent = encrypt(text || mediaUrl);
           
           const newMessage = await Message.create({
             chatRoomId,
@@ -101,7 +101,13 @@ class SocketServer {
             this.io.to(`user:${receiverId}`).emit('message:new', messageData);
           }
           
-          eventPublisher.publishMessageSent({ messageId: newMessage._id.toString(), senderId: socket.userId, receiverId });
+          eventPublisher.publishMessageSent({ 
+            messageId: newMessage._id.toString(), 
+            chatRoomId: chatRoomId.toString(),
+            sender: socket.userId, 
+            receivers: [receiverId],
+            type: messageType
+          });
           
           if (callback) callback({ success: true, messageId: newMessage._id });
 
@@ -113,12 +119,28 @@ class SocketServer {
 
       // Task 5.10 / 5.11 / 5.12 Handling logic components mapping status hooks cleanly
       socket.on('message:delivered', async (payload) => {
-        eventPublisher.publishMessageDelivered(payload);
+        try {
+          await Message.findByIdAndUpdate(payload.messageId, { status: 'delivered' });
+        } catch(e) {
+          log.error('Failed to update delivered status in MongoDB', { error: e.message, payload });
+        }
+        eventPublisher.publishMessageDelivered({ 
+          messageId: payload.messageId, 
+          userId: socket.userId // Context user firing the event is the recipient handling the delivery
+        });
         this.io.to(`user:${payload.senderId}`).emit('message:status', { messageId: payload.messageId, status: 'delivered' });
       });
 
       socket.on('message:read', async (payload) => {
-        eventPublisher.publishMessageRead(payload);
+        try {
+          await Message.findByIdAndUpdate(payload.messageId, { status: 'read' });
+        } catch(e) {
+          log.error('Failed to update read status in MongoDB', { error: e.message, payload });
+        }
+        eventPublisher.publishMessageRead({ 
+          messageId: payload.messageId, 
+          userId: socket.userId 
+        });
         this.io.to(`user:${payload.senderId}`).emit('message:status', { messageId: payload.messageId, status: 'read' });
       });
 

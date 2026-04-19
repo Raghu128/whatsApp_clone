@@ -11,6 +11,7 @@ const router = Router();
 router.get('/profile', userController.getProfile);
 router.put('/profile', userController.updateProfile); // In real setting: add Joi validation mapping here
 router.get('/search', userController.searchUsers);
+router.get('/:id', userController.getUser);
 router.post('/avatar', userController.uploadAvatar);
 
 // Contact Routes

@@ -5,7 +5,7 @@
  */
 
 const { redisClient } = require('../config/redis');
-const eventPublisher = require('../events/publisher');
+const eventPublisher = require('../events');
 
 const ONLINE_PREFIX = 'presence:online:';
 const LASTSEEN_PREFIX = 'presence:lastseen:';
