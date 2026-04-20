@@ -23,6 +23,15 @@
 </p>
 
 <p align="center">
+  <a href="https://github.com/Raghu128/whatsApp_clone/stargazers"><img src="https://img.shields.io/github/stars/Raghu128/whatsApp_clone?style=flat-square&logo=github&color=yellow" alt="Stars"></a>
+  <a href="https://github.com/Raghu128/whatsApp_clone/network/members"><img src="https://img.shields.io/github/forks/Raghu128/whatsApp_clone?style=flat-square&logo=github&color=blue" alt="Forks"></a>
+  <a href="https://github.com/Raghu128/whatsApp_clone/issues"><img src="https://img.shields.io/github/issues/Raghu128/whatsApp_clone?style=flat-square&logo=github&color=red" alt="Issues"></a>
+  <a href="https://github.com/Raghu128/whatsApp_clone/commits/main"><img src="https://img.shields.io/github/last-commit/Raghu128/whatsApp_clone?style=flat-square&logo=github" alt="Last commit"></a>
+  <img src="https://img.shields.io/github/languages/top/Raghu128/whatsApp_clone?style=flat-square&color=orange" alt="Top language">
+  <img src="https://img.shields.io/github/repo-size/Raghu128/whatsApp_clone?style=flat-square&color=informational" alt="Repo size">
+</p>
+
+<p align="center">
   <a href="#-features">Features</a> •
   <a href="#-screenshots">Screenshots</a> •
   <a href="#-architecture">Architecture</a> •
@@ -36,6 +45,12 @@
   <a href="#-roadmap">Roadmap</a> •
   <a href="#-contributing">Contributing</a>
 </p>
+
+---
+
+> **WhatsApp Clone** is a production-style, horizontally scalable real-time chat platform built as **7 independent Node.js microservices** (Auth, User, Chat, Presence, Media, Notification, API Gateway) with **Socket.io** for real-time messaging, **gRPC** for low-latency inter-service calls, **Redis Pub/Sub + BullMQ** for event-driven workflows, **AES-256-GCM** message encryption at rest, **stateless JWT** authentication at the gateway, and a **React + Zustand** frontend. The entire stack — 7 services + PostgreSQL + MongoDB + Redis — ships as a single `docker compose up`.
+>
+> Built to demonstrate distributed-systems patterns end-to-end: **O(1) cross-node message routing** via a Redis-backed connection directory, **event-driven inter-service communication**, **chunk-based sharding** strategy for the chat tier, and **3-layer authorization** (REST + WebSocket + UX).
 
 ---
 
@@ -923,7 +938,25 @@ This project is licensed under the **MIT License** — see the [LICENSE](LICENSE
 
 ---
 
+## 📈 Star History
+
+<a href="https://star-history.com/#Raghu128/whatsApp_clone&Date">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=Raghu128/whatsApp_clone&type=Date&theme=dark" />
+    <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=Raghu128/whatsApp_clone&type=Date" />
+    <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=Raghu128/whatsApp_clone&type=Date" />
+  </picture>
+</a>
+
+If this project helped you understand distributed chat architectures, microservices, or any of the patterns demonstrated here — **a star on the repo is the single fastest way to say thanks**, and it genuinely helps other learners discover the project via GitHub search.
+
+---
+
 <p align="center">
   Built with ❤️ by <a href="https://github.com/Raghu128">Raghu Kumar</a><br/>
+  <a href="https://raghu-kumar.vercel.app/">Portfolio</a> •
+  <a href="https://www.linkedin.com/in/raghu-kumar-sde/">LinkedIn</a> •
+  <a href="https://github.com/Raghu128">GitHub</a>
+  <br/><br/>
   ⭐ If this project helped you, consider starring the repo!
 </p>
