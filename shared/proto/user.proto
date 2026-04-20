@@ -14,6 +14,11 @@ service UserService {
 
   // Get multiple user profiles in a batch
   rpc GetUserProfiles (GetUserProfilesRequest) returns (GetUserProfilesResponse);
+
+  // Check whether target_user_id is in owner_user_id's contact list
+  // (and whether that relationship is blocked). Used to enforce
+  // "only contacts can chat" at the service boundary.
+  rpc CheckContact (CheckContactRequest) returns (CheckContactResponse);
 }
 
 // ── GetUserProfile ──
@@ -58,4 +63,16 @@ message GetUserProfilesRequest {
 
 message GetUserProfilesResponse {
   repeated GetUserProfileResponse profiles = 1;
+}
+
+// ── CheckContact ──
+
+message CheckContactRequest {
+  string owner_user_id = 1;   // The user who is trying to chat / send
+  string target_user_id = 2;  // The other participant
+}
+
+message CheckContactResponse {
+  bool exists = 1;     // owner has target saved as a contact
+  bool is_blocked = 2; // owner has blocked target
 }

@@ -1,0 +1,120 @@
+/* ===========================
+   Profile Panel — Slide-out
+   =========================== */
+
+.profile-panel {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: var(--bg-secondary);
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  animation: slideInLeft var(--transition-slow) both;
+}
+
+.profile-panel-header {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding: 16px 20px;
+  background: var(--bg-tertiary);
+  border-bottom: 1px solid var(--border);
+}
+
+.profile-panel-header button {
+  color: var(--text-secondary);
+  transition: color var(--transition-fast);
+}
+
+.profile-panel-header button:hover {
+  color: var(--text-primary);
+}
+
+.profile-panel-header h2 {
+  font-size: var(--font-md);
+  font-weight: 600;
+}
+
+.profile-panel-avatar {
+  display: flex;
+  justify-content: center;
+  padding: 32px 0;
+  background: var(--bg-tertiary);
+}
+
+.profile-panel-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0;
+}
+
+.profile-field {
+  padding: 16px 24px;
+  border-bottom: 1px solid var(--border);
+}
+
+.profile-field-label {
+  font-size: var(--font-xs);
+  color: var(--accent);
+  margin-bottom: 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  font-weight: 500;
+}
+
+.profile-field-value {
+  font-size: var(--font-base);
+  color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.profile-field-value input {
+  flex: 1;
+  background: transparent;
+  color: var(--text-primary);
+  border: none;
+  border-bottom: 2px solid var(--accent);
+  padding: 4px 0;
+  font-size: var(--font-base);
+}
+
+.profile-field-edit {
+  color: var(--text-secondary);
+  padding: 4px 8px;
+  border-radius: var(--radius-sm);
+  transition: all var(--transition-fast);
+}
+
+.profile-field-edit:hover {
+  color: var(--text-primary);
+  background: var(--bg-hover);
+}
+
+.profile-save-btn {
+  margin: 20px 24px;
+  padding: 10px 20px;
+  background: var(--accent);
+  color: #fff;
+  border-radius: var(--radius-md);
+  font-weight: 600;
+  font-size: var(--font-sm);
+  transition: all var(--transition-fast);
+  width: calc(100% - 48px);
+}
+
+.profile-save-btn:hover {
+  background: var(--accent-hover);
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-glow);
+}
+
+.profile-save-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}

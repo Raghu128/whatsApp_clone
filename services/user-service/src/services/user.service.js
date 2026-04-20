@@ -21,14 +21,19 @@ class UserService {
       throw new AppError('Profile not found', 404, 'NOT_FOUND');
     }
 
-    const { status_message, last_seen_privacy, profile_photo_privacy, status_privacy } = updateData;
+    const { username, about, status_message, last_seen_privacy, profile_photo_privacy, status_privacy } = updateData;
 
-    await profile.update({
-      status_message: status_message !== undefined ? status_message : profile.status_message,
-      last_seen_privacy: last_seen_privacy || profile.last_seen_privacy,
-      profile_photo_privacy: profile_photo_privacy || profile.profile_photo_privacy,
-      status_privacy: status_privacy || profile.status_privacy,
-    });
+    // Accept 'about' from frontend as alias for 'status_message'
+    const newStatusMessage = about || status_message;
+
+    const updates = {};
+    if (username !== undefined) updates.username = username;
+    if (newStatusMessage !== undefined) updates.status_message = newStatusMessage;
+    if (last_seen_privacy) updates.last_seen_privacy = last_seen_privacy;
+    if (profile_photo_privacy) updates.profile_photo_privacy = profile_photo_privacy;
+    if (status_privacy) updates.status_privacy = status_privacy;
+
+    await profile.update(updates);
 
     return profile.toSafeJSON();
   }

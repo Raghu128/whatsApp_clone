@@ -217,46 +217,104 @@
 
 ---
 
-## Phase 9: React Frontend ⏱️ ~4 hours `⬜ Not Started`
+## Phase 9: React Frontend ⏱️ ~4 hours `✅ Complete`
 
 | # | Task | Status |
 |---|---|---|
-| 9.1 | Initialize React app (Vite) in `client/` | ⬜ |
-| 9.2 | Design system — color palette, typography, CSS variables | ⬜ |
-| 9.3 | Auth context + `useAuth` hook | ⬜ |
-| 9.4 | Socket.io client + `useSocket` hook | ⬜ |
-| 9.5 | Chat context + `useChat` hook | ⬜ |
-| 9.6 | Login page | ⬜ |
-| 9.7 | Register page | ⬜ |
-| 9.8 | Chat list sidebar (last message preview + unread count) | ⬜ |
-| 9.9 | Chat window — message bubbles (sent/received) | ⬜ |
-| 9.10 | Message input — text + media attachment picker | ⬜ |
-| 9.11 | Message status indicators (✓ ✓✓ 🔵✓✓) | ⬜ |
-| 9.12 | Typing indicator animation | ⬜ |
-| 9.13 | Online/offline status badges (green dot) | ⬜ |
-| 9.14 | Group chat — create group modal | ⬜ |
-| 9.15 | Group chat — group info panel | ⬜ |
-| 9.16 | User profile page | ⬜ |
-| 9.17 | Notification badges | ⬜ |
-| 9.18 | Responsive design (mobile + desktop) | ⬜ |
+| 9.1 | Initialize React app (Vite) in `frontend/` | ✅ |
+| 9.2 | Design system — WhatsApp-like color palette, typography, CSS variables | ✅ |
+| 9.3 | **Zustand** stores (`authStore`, `chatStore`, `presenceStore`, `notificationStore`) instead of Context API | ✅ |
+| 9.4 | Centralized Axios API client (`src/services/api.js`) with interceptors for auth + token refresh | ✅ |
+| 9.5 | Socket.io client wrapper with auto-reconnect + JWT handshake | ✅ |
+| 9.6 | Login page (`LoginPage.jsx`) | ✅ |
+| 9.7 | Register page (`RegisterPage.jsx`) | ✅ |
+| 9.8 | Sidebar — chats list with last message preview, unread count, search | ✅ |
+| 9.9 | `ChatArea` — message bubbles (sent/received) with timestamps | ✅ |
+| 9.10 | Message input — text, emoji, media attachment picker | ✅ |
+| 9.11 | Message status indicators (✓ sent, ✓✓ delivered, 🔵✓✓ read) | ✅ |
+| 9.12 | Typing indicator animation wired to Presence Service | ✅ |
+| 9.13 | Online/offline status badges (green dot) driven by `presenceStore` | ✅ |
+| 9.14 | `ContactsPanel` — list, add, remove, block contacts | ✅ |
+| 9.15 | `AddContactModal` — add new contacts by phone + custom name | ✅ |
+| 9.16 | `MessageContextMenu` — long-press/right-click actions (delete, copy) | ✅ |
+| 9.17 | `ProfilePanel` — view/edit own profile, avatar, status | ✅ |
+| 9.18 | `Avatar` component with fallback initials | ✅ |
+| 9.19 | `EmptyState` component for no-chat-selected view | ✅ |
+| 9.20 | Notification badges (unread count per chat + global) | ✅ |
+| 9.21 | Responsive layout (mobile + desktop breakpoints) | ✅ |
 
-**Deliverables:** Fully functional WhatsApp-like web UI connected to all backend services.
+**Deliverables:** Fully functional WhatsApp-like web UI connected to all backend services via REST + WebSocket, with optimistic UI updates and graceful error handling.
 
 ---
 
-## Phase 10: Documentation & Polish ⏱️ ~2 hours `⬜ Not Started`
+## Phase 10: Documentation & Polish ⏱️ ~2 hours `✅ Complete`
 
 | # | Task | Status |
 |---|---|---|
-| 10.1 | Professional `README.md` with architecture diagram | ⬜ |
-| 10.2 | `SCALING_STRATEGY.md` — MongoDB sharding, PG replicas, Redis cluster | ⬜ |
-| 10.3 | Swagger docs consolidated for all 6 services | ⬜ |
-| 10.4 | `SOCKET_EVENTS.md` — WebSocket event catalog | ⬜ |
-| 10.5 | `INTER_SERVICE_COMMUNICATION.md` — Event flows | ⬜ |
-| 10.6 | Database scaling docs (chunk-based sharding, read/write splitting) | ⬜ |
-| 10.7 | Final code review + cleanup | ⬜ |
+| 10.1 | Professional `README.md` with banner, architecture diagram, full TOC | ✅ |
+| 10.2 | Scaling strategy folded into README + `docs/ARCHITECTURE.md` (sharding, PG replicas, Redis cluster) | ✅ |
+| 10.3 | `docs/ARCHITECTURE.md` — deep-dive system design document | ✅ |
+| 10.4 | WebSocket event catalog documented in README API Reference | ✅ |
+| 10.5 | Inter-service communication patterns (gRPC + Pub/Sub + BullMQ) documented | ✅ |
+| 10.6 | Database scaling docs (chunk-based sharding, read/write splitting) | ✅ |
+| 10.7 | `LICENSE` file added (MIT) | ✅ |
+| 10.8 | `docs/` folder created; `ARCHITECTURE.md` + `PHASES.md` moved there | ✅ |
+| 10.9 | `.gitignore` hardened against scratch docs leaking into public repo | ✅ |
+| 10.10 | README sections: Troubleshooting, FAQ, Roadmap, Code of Conduct, Responsible Disclosure | ✅ |
+| 10.11 | Final code review + cleanup | ✅ |
 
-**Deliverables:** Interview-ready documentation, clean codebase.
+**Deliverables:** Open-source-ready repo with comprehensive README, deep-dive architecture doc, MIT license, and clean public/private doc separation.
+
+---
+
+## Phase 11: Hardening & Open-Source Readiness ⏱️ ~3 hours `✅ Complete`
+
+> Post-MVP pass focused on correctness bugs, authorization gaps, frontend/backend contract drift, and repo polish before open-sourcing.
+
+### 11.1 Backend correctness fixes
+
+| # | Task | Status |
+|---|---|---|
+| 11.1.1 | **Fix route-ordering bug** in `user-service` — `/contacts` was being captured by `/:id`, causing `invalid input syntax for type uuid: "contacts"` from Postgres. Moved specific routes above dynamic ones in `user.routes.js`. | ✅ |
+| 11.1.2 | **Fix silent `clearChat` bug** — write side set `clearedAt` on `ChatRoom`, but `getMessages` ignored it, so messages reappeared. Rewrote `message.controller.js#getMessages` to filter `createdAt > clearedAt[userId]` and also respect per-user `deletedFor` soft-deletes. | ✅ |
+| 11.1.3 | Add participant-authorization guard to `getMessages` (403 if caller is not in `ChatRoom.participants`) | ✅ |
+| 11.1.4 | Add `mongoose.isValidObjectId` guard to `getMessages` to reject garbage IDs with a 400 instead of a 500 | ✅ |
+
+### 11.2 Contact-gated chat authorization (3-layer defense)
+
+| # | Task | Status |
+|---|---|---|
+| 11.2.1 | Add `CheckContact` RPC to `shared/proto/user.proto` (`owner_user_id`, `target_user_id` → `exists`, `is_blocked`) | ✅ |
+| 11.2.2 | Implement `checkContact` handler in `user-service/src/grpc/server.js` using the `Contact` Sequelize model | ✅ |
+| 11.2.3 | Create `chat-service/src/grpc/userClient.js` — promisified gRPC client for User Service | ✅ |
+| 11.2.4 | **Layer 1 (REST):** guard `getOrCreateChat` — only create a new chat room if target is an existing non-blocked contact; return `NOT_A_CONTACT` or `CONTACT_BLOCKED` error codes | ✅ |
+| 11.2.5 | **Layer 2 (Socket):** guard `message:send` in `chat-service/src/socket/server.js` — verify sender is in `ChatRoom.participants` before persisting/routing | ✅ |
+| 11.2.6 | **Layer 3 (Frontend UX):** catch `NOT_A_CONTACT` / `CONTACT_BLOCKED` in `chatStore.startChat`, surface friendly prompt, auto-open `AddContactModal` pre-filled with the target user's details | ✅ |
+
+### 11.3 Frontend ↔ backend contract reconciliation
+
+| # | Task | Status |
+|---|---|---|
+| 11.3.1 | Rewrite `frontend/src/services/api.js` to match backend route signatures (`addContact(targetPhone, customName)`, `removeContact(contactUserId)`, `blockContact`, `uploadAvatar`, `deleteMessage`) | ✅ |
+| 11.3.2 | Fix media upload URL (`/media` → `/media/upload`) and add `getMediaUrl` / `getThumbnailUrl` helpers | ✅ |
+| 11.3.3 | Implement **delete message** in `ChatArea.jsx` with optimistic UI + rollback on failure | ✅ |
+| 11.3.4 | Implement **clear chat** flow end-to-end (confirm → API → refresh) | ✅ |
+| 11.3.5 | Implement **add / remove / block contact** in `ContactsPanel.jsx` with proper response shaping (handle nested `contactDetails`) | ✅ |
+| 11.3.6 | Wire `AddContactModal` to accept `initialPhone` / `initialName` so it can be reused for both manual-add and "add-before-chat" flows | ✅ |
+| 11.3.7 | Enrich error objects thrown from `chatStore` with `code` + `status` so UI can branch on specific backend errors | ✅ |
+
+### 11.4 Repo & documentation polish
+
+| # | Task | Status |
+|---|---|---|
+| 11.4.1 | Rewrite `README.md` end-to-end (TOC, banner, features, architecture, quickstart, env matrix, API reference, auth model, troubleshooting, FAQ, roadmap, contributing, code of conduct, disclosure) | ✅ |
+| 11.4.2 | Add `LICENSE` file (MIT) — was referenced in `package.json` but missing | ✅ |
+| 11.4.3 | Create `docs/` directory; move `ARCHITECTURE.md` and `PHASES.md` into it | ✅ |
+| 11.4.4 | Delete `implementation_plan.md` (internal scratch, not for publication) | ✅ |
+| 11.4.5 | Add **Further Reading** section in README linking to `docs/ARCHITECTURE.md` and `docs/PHASES.md` | ✅ |
+| 11.4.6 | Harden `.gitignore` so future scratch docs (`NOTES.md`, `SCRATCH.md`, `TODO.md`, `implementation_plan.md`, `docs/internal/`) never get committed | ✅ |
+
+**Deliverables:** Auth/authz gaps closed at three layers, write/read inconsistencies fixed, frontend matches backend contract, repo is clean and ready to be pushed publicly.
 
 ---
 
@@ -272,10 +330,11 @@
 | 6 | Presence Service | 12 | 12 | ✅ Complete |
 | 7 | Media Service | 12 | 12 | ✅ Complete |
 | 8 | Notification Service | 14 | 14 | ✅ Complete |
-| 9 | React Frontend | 18 | 0 | ⬜ Not Started |
-| 10 | Documentation & Polish | 7 | 0 | ⬜ Not Started |
-| **Total** | | **164** | **139** | **84%** |
+| 9 | React Frontend | 21 | 21 | ✅ Complete |
+| 10 | Documentation & Polish | 11 | 11 | ✅ Complete |
+| 11 | Hardening & Open-Source Readiness | 23 | 23 | ✅ Complete |
+| **Total** | | **194** | **194** | **100%** |
 
 ---
 
-*Last updated: 2026-04-15*
+*Last updated: 2026-04-21*

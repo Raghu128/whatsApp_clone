@@ -9,7 +9,7 @@ const protoLoader = require('@grpc/proto-loader');
 const path = require('path');
 const logger = require('@whatsapp-clone/shared/utils/logger');
 const config = require('../config/env');
-const { UserProfile } = require('../models');
+const { UserProfile, Contact } = require('../models');
 
 const log = logger.child({ service: 'user-service', component: 'grpc' });
 
@@ -40,11 +40,33 @@ async function getGroupMembers(call, callback) {
   callback(null, { members: [] });
 }
 
+async function checkContact(call, callback) {
+  try {
+    const { ownerUserId, targetUserId } = call.request;
+
+    if (!ownerUserId || !targetUserId) {
+      return callback({ code: grpc.status.INVALID_ARGUMENT, message: 'owner and target user ids are required' });
+    }
+
+    const contact = await Contact.findOne({
+      where: { owner_id: ownerUserId, contact_id: targetUserId },
+    });
+
+    callback(null, {
+      exists: !!contact,
+      isBlocked: !!contact?.is_blocked,
+    });
+  } catch (error) {
+    log.error('checkContact failed', { error: error.message });
+    callback({ code: grpc.status.INTERNAL, message: error.message });
+  }
+}
+
 let grpcServer = null;
 
 function startGrpcServer() {
   grpcServer = new grpc.Server();
-  grpcServer.addService(userProto.UserService.service, { getUserProfile, getGroupMembers });
+  grpcServer.addService(userProto.UserService.service, { getUserProfile, getGroupMembers, checkContact });
 
   const port = config.USER_GRPC_PORT || 50052;
   grpcServer.bindAsync(`0.0.0.0:${port}`, grpc.ServerCredentials.createInsecure(), (err, boundPort) => {

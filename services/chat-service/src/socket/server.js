@@ -71,7 +71,21 @@ class SocketServer {
             return callback && callback({ success: false, error: 'Invalid message payload' });
           }
 
-          // Task 5.15: AES Integration configuring properties safely
+          // Authorization: sender must be a participant of this chat room.
+          // This closes the loophole where a client skips REST /chats and sends
+          // directly via socket with a known chatRoomId.
+          const room = await ChatRoom.findById(chatRoomId).select('participants');
+          if (!room) {
+            return callback && callback({ success: false, error: 'Chat not found' });
+          }
+          if (!room.participants.includes(socket.userId)) {
+            log.warn('message:send blocked — sender is not a participant', {
+              userId: socket.userId,
+              chatRoomId,
+            });
+            return callback && callback({ success: false, error: 'Not a participant of this chat' });
+          }
+
           const encryptedContent = encrypt(text || mediaUrl);
           
           const newMessage = await Message.create({

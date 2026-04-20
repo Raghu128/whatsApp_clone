@@ -1,0 +1,25 @@
+FROM node:20-alpine
+
+WORKDIR /usr/src/app
+
+# Copy root package files
+COPY package.json package-lock.json ./
+
+# Copy shared library and all services
+COPY shared ./shared
+COPY services ./services
+
+# The root package.json references a "client" workspace that doesn't exist
+# in the backend image. Create an empty placeholder so npm ci doesn't crash.
+RUN mkdir -p client && echo '{"name":"client","version":"1.0.0","private":true}' > client/package.json
+
+# Install production dependencies across all workspaces
+RUN npm ci --omit=dev
+
+# We use a build arg to determine which service to start
+ARG SERVICE_NAME
+ENV SERVICE_NAME=${SERVICE_NAME}
+
+EXPOSE 3000 3001 3002 3003 3004 3005 3006
+
+CMD npm run start --workspace=services/${SERVICE_NAME}

@@ -1,0 +1,12 @@
+node_modules
+npm-debug.log*
+.git
+.gitignore
+.env
+.env.example
+.env.docker
+*.md
+.DS_Store
+frontend/node_modules
+frontend/dist
+services/*/node_modules

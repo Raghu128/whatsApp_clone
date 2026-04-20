@@ -1,0 +1,78 @@
+/* ===========================
+   Avatar Component
+   Reusable: image + fallback initials + online dot
+   =========================== */
+
+.avatar-wrapper {
+  position: relative;
+  display: inline-flex;
+  flex-shrink: 0;
+}
+
+.avatar-img {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.avatar-initials {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  color: var(--text-primary);
+  background: linear-gradient(135deg, #2a3942 0%, #1f2c33 100%);
+  text-transform: uppercase;
+  user-select: none;
+}
+
+.avatar-wrapper--xs { width: 28px; height: 28px; }
+.avatar-wrapper--xs .avatar-initials { font-size: 0.625rem; }
+
+.avatar-wrapper--sm { width: 36px; height: 36px; }
+.avatar-wrapper--sm .avatar-initials { font-size: 0.7rem; }
+
+.avatar-wrapper--md { width: 42px; height: 42px; }
+.avatar-wrapper--md .avatar-initials { font-size: 0.8rem; }
+
+.avatar-wrapper--lg { width: 56px; height: 56px; }
+.avatar-wrapper--lg .avatar-initials { font-size: 1rem; }
+
+.avatar-wrapper--xl { width: 80px; height: 80px; }
+.avatar-wrapper--xl .avatar-initials { font-size: 1.4rem; }
+
+.avatar-wrapper--xxl { width: 120px; height: 120px; }
+.avatar-wrapper--xxl .avatar-initials { font-size: 2rem; }
+
+.avatar-online-dot {
+  position: absolute;
+  bottom: 1px;
+  right: 1px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #25d366;
+  border: 2px solid var(--bg-secondary);
+  z-index: 1;
+}
+
+.avatar-wrapper--xs .avatar-online-dot,
+.avatar-wrapper--sm .avatar-online-dot {
+  width: 8px;
+  height: 8px;
+  bottom: 0;
+  right: 0;
+}
+
+.avatar-wrapper--xl .avatar-online-dot,
+.avatar-wrapper--xxl .avatar-online-dot {
+  width: 14px;
+  height: 14px;
+  bottom: 3px;
+  right: 3px;
+  border-width: 3px;
+}

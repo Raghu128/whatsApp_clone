@@ -40,3 +40,11 @@ coverage/
 # Temporary files
 *.tmp
 *.temp
+
+# Local-only scratch notes / planning docs (not for publication)
+# Keep published docs under docs/ instead.
+/implementation_plan.md
+/NOTES.md
+/SCRATCH.md
+/TODO.md
+/docs/internal/

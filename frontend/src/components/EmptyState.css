@@ -1,0 +1,59 @@
+/* ===========================
+   Empty State — No Chat Selected
+   =========================== */
+
+.empty-state {
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-chat);
+  padding: 40px;
+}
+
+.empty-state-content {
+  text-align: center;
+  max-width: 500px;
+}
+
+.empty-state-icon {
+  margin-bottom: 28px;
+  color: var(--accent);
+  opacity: 0.3;
+}
+
+.empty-state h2 {
+  font-size: var(--font-xl);
+  font-weight: 300;
+  color: var(--text-primary);
+  margin-bottom: 12px;
+  letter-spacing: -0.5px;
+}
+
+.empty-state p {
+  font-size: var(--font-base);
+  color: var(--text-secondary);
+  line-height: 1.6;
+  margin-bottom: 32px;
+}
+
+.empty-state-features {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  align-items: center;
+}
+
+.empty-feature {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: var(--font-sm);
+  color: var(--text-muted);
+}
+
+.empty-feature svg {
+  color: var(--accent);
+  opacity: 0.6;
+  flex-shrink: 0;
+}

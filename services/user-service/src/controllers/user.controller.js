@@ -5,6 +5,7 @@
 const { success } = require('@whatsapp-clone/shared/utils/responseFormatter');
 const userService = require('../services/user.service');
 const contactService = require('../services/contact.service');
+const logger = require('@whatsapp-clone/shared/utils/logger');
 
 const userController = {
   // Profiles

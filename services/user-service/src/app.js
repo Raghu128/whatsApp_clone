@@ -21,6 +21,7 @@ const { app, log, mountErrorHandler } = createBaseApp({
 // Primary application routing mappings
 const userRoutes = require('./routes/user.routes');
 // Any requests to /api/v1/users will arrive naturally from the Gateway Proxy configurations matching natively
+
 app.use('/api/v1/users', userRoutes);
 
 mountErrorHandler();
