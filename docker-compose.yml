@@ -1,10 +1,10 @@
 # ============================================
-# WhatsApp Clone — Docker Compose
+# WhatsApp Clone — Docker Compose (Full Stack)
 # ============================================
-# Spins up all infrastructure dependencies:
-#   - PostgreSQL (auth_db on 5432, user_db on 5433)
-#   - MongoDB (chat_db + notification_db on 27017)
-#   - Redis (6379)
+# Spins up the entire application:
+#   Infrastructure: PostgreSQL (x2), MongoDB, Redis
+#   Services:       API Gateway, Auth, User, Chat, Presence, Notification, Media
+#   Frontend:       Vite React app served via Nginx
 #
 # Usage:
 #   docker compose up -d         # Start all
@@ -13,6 +13,10 @@
 #   docker compose down -v       # Stop + delete volumes
 
 services:
+  # ══════════════════════════════════════════
+  #   INFRASTRUCTURE
+  # ══════════════════════════════════════════
+
   # ── PostgreSQL: Auth DB ──
   postgres-auth:
     image: postgres:16-alpine
@@ -81,6 +85,145 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+
+  # ══════════════════════════════════════════
+  #   MICROSERVICES
+  # ══════════════════════════════════════════
+
+  # ── Auth Service ──
+  auth-service:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+      args:
+        SERVICE_NAME: auth-service
+    container_name: whatsapp-auth-service
+    restart: unless-stopped
+    depends_on:
+      postgres-auth:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    env_file:
+      - .env.docker
+
+  # ── User Service ──
+  user-service:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+      args:
+        SERVICE_NAME: user-service
+    container_name: whatsapp-user-service
+    restart: unless-stopped
+    depends_on:
+      postgres-user:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    env_file:
+      - .env.docker
+
+  # ── Chat Service ──
+  chat-service:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+      args:
+        SERVICE_NAME: chat-service
+    container_name: whatsapp-chat-service
+    restart: unless-stopped
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    env_file:
+      - .env.docker
+
+  # ── Presence Service ──
+  presence-service:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+      args:
+        SERVICE_NAME: presence-service
+    container_name: whatsapp-presence-service
+    restart: unless-stopped
+    depends_on:
+      redis:
+        condition: service_healthy
+    env_file:
+      - .env.docker
+
+  # ── Notification Service ──
+  notification-service:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+      args:
+        SERVICE_NAME: notification-service
+    container_name: whatsapp-notification-service
+    restart: unless-stopped
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    env_file:
+      - .env.docker
+
+  # ── Media Service ──
+  media-service:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+      args:
+        SERVICE_NAME: media-service
+    container_name: whatsapp-media-service
+    restart: unless-stopped
+    depends_on:
+      redis:
+        condition: service_healthy
+    env_file:
+      - .env.docker
+
+  # ══════════════════════════════════════════
+  #   GATEWAY + FRONTEND
+  # ══════════════════════════════════════════
+
+  # ── API Gateway ──
+  api-gateway:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+      args:
+        SERVICE_NAME: api-gateway
+    container_name: whatsapp-api-gateway
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    depends_on:
+      - auth-service
+      - user-service
+      - chat-service
+      - presence-service
+      - media-service
+      - notification-service
+    env_file:
+      - .env.docker
+
+  # ── Frontend (Vite + Nginx) ──
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+    container_name: whatsapp-frontend
+    restart: unless-stopped
+    ports:
+      - "5173:80"
+    depends_on:
+      - api-gateway
 
 volumes:
   postgres_auth_data:
