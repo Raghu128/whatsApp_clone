@@ -109,22 +109,6 @@
 
 ---
 
-## 📸 Screenshots
-
-<!-- Replace these with real screenshots/GIFs before going public -->
-
-| Login | Chat List | Conversation |
-| --- | --- | --- |
-| _(add screenshot)_ | _(add screenshot)_ | _(add screenshot)_ |
-
-| Contacts Panel | Add Contact | Profile |
-| --- | --- | --- |
-| _(add screenshot)_ | _(add screenshot)_ | _(add screenshot)_ |
-
-> 💡 Drop PNGs/GIFs into `assets/` and reference them here. A short demo GIF at the top of this section is the single highest-impact addition for a public repo.
-
----
-
 ## 🏗 Architecture
 
 ### High-Level Overview
